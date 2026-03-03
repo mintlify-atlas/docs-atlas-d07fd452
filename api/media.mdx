@@ -5,6 +5,37 @@ description: Manage your media library and stream content
 
 The Media API allows you to manage your personal media library, add content from magnet links, track downloads, and stream video.
 
+## Continue Watching
+
+Get recently watched media items for the "Continue Watching" feature.
+
+```http
+GET /api/media/continue-watching
+```
+
+### Response
+
+Returns up to 20 recently watched media items sorted by last played time.
+
+```json
+[
+  {
+    "id": "clx123456",
+    "type": "movie",
+    "title": "Inception",
+    "year": 2010,
+    "posterUrl": "https://...",
+    "playPosition": 3245.5,
+    "playDuration": 8880,
+    "lastPlayedAt": "2024-03-15T20:30:00Z"
+  }
+]
+```
+
+<Note>
+  This endpoint returns media items that have been started (playPosition > 0) but not completed (playPosition < 90% of playDuration).
+</Note>
+
 ## List Media
 
 Retrieve all media items in your library.
