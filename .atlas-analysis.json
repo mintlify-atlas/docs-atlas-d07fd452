@@ -1,0 +1,117 @@
+{
+  "projectType": "saas",
+  "projectName": "Plank",
+  "projectDescription": "A self-hosted media server for streaming movies and TV shows via torrents",
+  "theme": "palm",
+  "primaryColor": "#8B5CF6",
+  "lightColor": "#C4B5FD",
+  "darkColor": "#6D28D9",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Get Started",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["introduction", "features"]
+          },
+          {
+            "group": "Installation",
+            "pages": [
+              "installation/quick-start",
+              "installation/docker",
+              "installation/bare-metal",
+              "installation/environment-variables"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/first-time-setup",
+              "configuration/torrent-indexers"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Features",
+        "groups": [
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/media-library",
+              "features/streaming",
+              "features/search-browse",
+              "features/organizations",
+              "features/subtitles"
+            ]
+          },
+          {
+            "group": "User Management",
+            "pages": [
+              "features/authentication",
+              "features/profiles-invitations"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Integrations",
+        "groups": [
+          {
+            "group": "External Services",
+            "pages": [
+              "integrations/tmdb",
+              "integrations/prowlarr",
+              "integrations/opensubtitles",
+              "integrations/flaresolverr"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Advanced",
+        "groups": [
+          {
+            "group": "Guides",
+            "pages": [
+              "advanced/troubleshooting",
+              "advanced/security",
+              "advanced/development"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "api/overview",
+              "api/media",
+              "api/browse",
+              "api/subtitles"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Stream torrents while downloading with WebTorrent",
+    "Browse and search movies/TV shows via TMDB integration",
+    "Multi-tenant organization profiles with admin controls",
+    "Automatic subtitle downloads in multiple languages",
+    "Torrent search and discovery via Prowlarr",
+    "Docker-ready deployment with Prowlarr and FlareSolverr",
+    "Progress tracking and resume playback",
+    "SQLite database with Drizzle ORM"
+  ],
+  "publicApiSurface": [
+    "/api/media - Media library management",
+    "/api/media/[id]/stream - Video streaming endpoint",
+    "/api/media/[id]/progress - Playback progress tracking",
+    "/api/media/[id]/subtitles - Subtitle management",
+    "/api/browse - Torrent search and discovery",
+    "/api/browse/resolve - Resolve torrent to media",
+    "/api/auth - Better-auth authentication endpoints",
+    "Database schema: media, seasons, episodes, downloads, subtitles",
+    "Environment variables: TMDB_API_KEY, PROWLARR_URL, DATABASE_URL"
+  ]
+}
