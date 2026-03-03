@@ -1,0 +1,229 @@
+---
+title: Welcome to Plank
+description: A self-hosted media server for streaming torrents with Netflix-like experience
+---
+
+<img
+  className="block dark:hidden"
+  src="/images/hero-light.png"
+  alt="Plank Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/hero-dark.png"
+  alt="Plank Hero Dark"
+/>
+
+## Stream torrents like Netflix
+
+Plank is a self-hosted media server that lets you stream movies and TV shows directly from torrents. No waiting for downloads - start watching in seconds with a beautiful, Netflix-like interface.
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick Start"
+    icon="rocket"
+    href="/installation/quick-start"
+  >
+    Deploy Plank in one command and start streaming immediately
+  </Card>
+  <Card
+    title="Features"
+    icon="stars"
+    href="/features/media-library"
+  >
+    Explore what makes Plank the ultimate self-hosted streaming solution
+  </Card>
+  <Card
+    title="Configuration"
+    icon="gear"
+    href="/configuration/first-time-setup"
+  >
+    Configure torrent indexers, API keys, and subtitle providers
+  </Card>
+  <Card
+    title="Organizations"
+    icon="users"
+    href="/features/organizations"
+  >
+    Set up profile-like organizations with admin controls
+  </Card>
+</CardGroup>
+
+## Why Plank?
+
+<AccordionGroup>
+  <Accordion title="Instant Streaming" icon="bolt">
+    Start watching movies and TV shows while they download. Plank uses WebTorrent to stream video files as soon as the first chunks are available - typically within seconds.
+
+    ```typescript
+    // Real code from torrent.ts:1432-1447
+    function isDownloadReadyForStreaming(download: ActiveDownload, fileIndex?: number): boolean {
+      if (!download) return false;
+      
+      // For TV shows with specific file index
+      if (download.mediaType === 'tv' && fileIndex !== undefined) {
+        const videoFile = download.videoFiles[fileIndex];
+        return Boolean(
+          videoFile &&
+          download.status !== 'initializing' &&
+          (videoFile.progress >= 0.02 || download.status === 'complete')
+        );
+      }
+      
+      // For movies - ready when 2% downloaded or complete
+      if (download.videoFile) {
+        return download.status !== 'initializing' && 
+               (download.progress >= 0.02 || download.status === 'complete');
+      }
+      
+      return false;
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Search & Discover" icon="magnifying-glass">
+    Browse and search any movie or TV show with rich metadata from TMDB. Add content to your library or stream directly - no manual torrent hunting required.
+
+    <Note>
+      Plank integrates with Prowlarr to search across multiple torrent indexers automatically. It filters for high-quality releases from trusted groups and selects the best torrent based on quality and seeders.
+    </Note>
+  </Accordion>
+
+  <Accordion title="Multi-User Support" icon="user-group">
+    Secure user accounts with profile-like organizations. The first user becomes admin and can create organizations (profiles) for family members or friends. Each organization has its own media library and admin controls.
+
+    ```typescript
+    // From auth.ts:42-53
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user) => {
+            // First user to register becomes admin
+            const existingUsers = db.select({ id: schema.user.id })
+              .from(schema.user).limit(1).all();
+            return {
+              data: {
+                ...user,
+                role: existingUsers.length === 0 ? 'admin' : 'user',
+              },
+            };
+          },
+        },
+      },
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Subtitles in Any Language" icon="closed-captioning">
+    Automatic subtitle discovery from sidecar files and integration with OpenSubtitles for downloading subtitles in any language.
+
+    Supported formats:
+    - `.vtt` (WebVTT)
+    - `.srt` (SubRip)
+    - `.ass` (Advanced SubStation Alpha)
+    - `.ssa` (SubStation Alpha)
+  </Accordion>
+
+  <Accordion title="Docker Ready" icon="docker">
+    One-command Docker deployment with Prowlarr and FlareSolverr pre-configured. Everything you need to start streaming is included.
+
+    ```bash
+    # One-line deploy (Linux)
+    bash <(curl -fsSL https://raw.githubusercontent.com/logscore/plank/master/scripts/deploy.sh)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## How it Works
+
+<Steps>
+  <Step title="Search for Content">
+    Search for any movie or TV show using TMDB integration. Plank displays rich metadata including posters, descriptions, ratings, and cast information.
+  </Step>
+
+  <Step title="Find the Best Torrent">
+    Plank automatically queries Prowlarr to search across your configured torrent indexers. It filters out low-quality releases (CAM, TS, etc.) and selects the best torrent based on:
+    - Quality (2160p > 1080p > 720p)
+    - Seeders (logarithmic scoring)
+    - Trusted release groups (configurable)
+
+    ```typescript
+    // From prowlarr.ts:143-152
+    function calculateScore(result: IndexerResult): number {
+      const quality = extractQuality(result.title);
+      const qualityScore = quality ? QUALITY_SCORES[quality] || 0 : 0;
+      
+      // Seeders score (logarithmic to not overweight high seeder counts)
+      const seederScore = Math.log10(result.seeders + 1) * 20;
+      
+      return qualityScore + seederScore;
+    }
+    ```
+  </Step>
+
+  <Step title="Start Streaming">
+    Add to your library or stream immediately. Plank downloads the torrent in the background while you watch. The video player starts as soon as 2% of the file is downloaded.
+  </Step>
+
+  <Step title="Organize Your Library">
+    All completed downloads are moved to your library directory with proper organization:
+    - Movies: `/library/{mediaId}/{filename}.mp4`
+    - TV Shows: `/library/{mediaId}/Season 01/{filename}.mp4`
+  </Step>
+</Steps>
+
+<Warning>
+  **Legal Disclaimer**: This software is provided for educational and legitimate use only. Users are solely responsible for ensuring compliance with their local copyright laws and regulations.
+
+  - **Copyright Laws**: Check your country's copyright laws before using torrents
+  - **Privacy Protection**: Strongly consider using a torrent-ready VPN
+  - **File Safety**: Never run executable files from unknown sources
+</Warning>
+
+## Quick Example
+
+Here's how Plank handles TV show episodes with automatic season/episode detection:
+
+```typescript
+// From torrent.ts:223-261
+function mapFilesToEpisodes(files: TorrentFile[], defaultSeason?: number): Map<number, number> {
+  const mapping = new Map<number, number>();
+  
+  for (const [index, file] of files.entries()) {
+    const parsed = ptt.parse(file.name);
+    
+    if (parsed.season !== undefined && parsed.episode !== undefined) {
+      // Standard S01E01 format
+      const episodeKey = parsed.season * 100 + parsed.episode;
+      mapping.set(episodeKey, index);
+    } else if (parsed.episode !== undefined) {
+      // Episode only (assume default season or season 1)
+      const season = defaultSeason ?? 1;
+      const episodeKey = season * 100 + parsed.episode;
+      mapping.set(episodeKey, index);
+    } else {
+      // Try regex patterns directly on filename
+      const sxxexx = file.name.match(/S(\d{1,2})E(\d{1,2})/i);
+      if (sxxexx) {
+        const season = parseInt(sxxexx[1], 10);
+        const episode = parseInt(sxxexx[2], 10);
+        const episodeKey = season * 100 + episode;
+        mapping.set(episodeKey, index);
+      }
+    }
+  }
+  
+  return mapping;
+}
+```
+
+## Get Started
+
+<CardGroup cols={2}>
+  <Card title="Deploy Now" icon="play" href="/installation/quick-start">
+    Get Plank running in under 5 minutes
+  </Card>
+  <Card title="View on GitHub" icon="github" href="https://github.com/logscore/plank">
+    Star the project and contribute
+  </Card>
+</CardGroup>

@@ -1,0 +1,172 @@
+---
+title: Media Library
+description: Manage your personal collection of movies and TV shows
+icon: library
+---
+
+Plank's media library is your personal streaming collection, powered by torrents and organized by profiles. Add content from the browse view or search, and watch it stream instantly.
+
+## Library Overview
+
+Your library displays all movies and TV shows you've added, organized by type with easy filtering and search.
+
+### Key Features
+
+<CardGroup cols={2}>
+  <Card title="Dual Library Views" icon="film">
+    Switch between Movies and TV Shows with a single tap. Each view shows a count of items in your collection.
+  </Card>
+  
+  <Card title="Continue Watching" icon="play-circle">
+    Resume playback right where you left off. The continue watching section appears at the top of your library when you have in-progress content.
+  </Card>
+  
+  <Card title="Profile-Based Collections" icon="users">
+    Each profile has its own separate library. Content is isolated per profile, perfect for families or shared accounts.
+  </Card>
+  
+  <Card title="Rich Metadata" icon="info">
+    Automatic TMDB integration provides posters, backdrops, descriptions, runtime, genres, and certification ratings.
+  </Card>
+</CardGroup>
+
+## Adding Media to Your Library
+
+There are three ways to add content to your library:
+
+### From Browse
+
+The browse view shows trending and popular content from TMDB:
+
+1. Navigate to the Browse tab
+2. Browse trending or popular content
+3. Click the plus icon on any movie or show
+4. For TV shows, select specific seasons from the context menu
+
+Content is automatically matched with high-quality torrents from trusted release groups via Prowlarr.
+
+### From Search
+
+Use the search feature to find specific titles:
+
+1. Click the search icon
+2. Enter the movie or show name
+3. Select from search results
+4. Add to your library
+
+### Direct Magnet Links
+
+You can also add content directly via magnet links if you have them from external sources.
+
+## Library Organization
+
+### Movies
+
+Movies are displayed in a grid layout with:
+- Movie poster
+- Title and year
+- MPAA rating badge (G, PG, PG-13, R, NC-17)
+- Download progress indicator
+- Quick actions menu
+
+### TV Shows
+
+TV shows include additional organization:
+- Show poster and metadata
+- Season and episode management
+- Individual episode tracking
+- Per-episode watch progress
+- Episode file management
+
+When you add a TV show, Plank automatically:
+1. Creates the show entry with TMDB metadata
+2. Fetches season and episode information
+3. Maps torrent files to episodes
+4. Tracks download progress per episode
+
+### TV Show Season Management
+
+Plank intelligently handles TV show seasons:
+
+- **Season Detection**: Automatically detects which seasons are included in a torrent
+- **Episode Mapping**: Maps video files to TMDB episode data
+- **Incremental Downloads**: Add individual seasons to existing shows
+- **Episode Organization**: Maintains proper episode order even with complex file structures
+
+## Media Status & Progress
+
+Each media item has a status that indicates its download state:
+
+- **Added**: Media has been added to your library but download hasn't started
+- **Downloading**: Actively downloading from peers
+- **Complete**: Fully downloaded and saved to your library directory
+- **Error**: Download failed (usually due to no seeders)
+
+### Download Progress
+
+While content is downloading, you'll see:
+- Real-time progress percentage
+- Download speed (MB/s or KB/s)
+- Number of connected peers
+- Estimated time remaining (in player view)
+
+You can start watching as soon as enough of the file has downloaded (typically 5% for movies, variable for TV episodes).
+
+## Continue Watching
+
+Plank automatically tracks your viewing progress:
+
+- **Auto-Resume**: Playback resumes from where you left off
+- **Progress Tracking**: Updated every 5 seconds during playback
+- **Completion Detection**: Items marked complete when you watch to the end
+- **Recent List**: Shows most recently watched items across your library
+
+The continue watching section appears at the top of your library and shows:
+- Large backdrop thumbnails
+- Watch progress bar
+- Time remaining
+- Quick resume playback
+
+## Library Management
+
+### Deleting Media
+
+Remove media from your library:
+
+1. Click the three-dot menu on any media card
+2. Select "Delete"
+3. Confirm the deletion
+
+This removes the media entry and all associated downloads from your profile. For TV shows, this deletes all seasons and episodes.
+
+### Retry Failed Downloads
+
+If a download fails (usually due to no seeders), you can:
+
+1. View the media detail page
+2. Click "Retry Download"
+3. Plank will attempt to resume the torrent
+
+Alternatively, delete and re-add with a different torrent source.
+
+## Search Your Library
+
+Quickly find content in your library using the search feature:
+
+- Full-text search powered by SQLite FTS5
+- Searches titles and descriptions
+- Instant results as you type
+- Fallback to fuzzy matching for partial matches
+
+Search is profile-scoped, so you only see content from your active profile.
+
+## Library Storage
+
+Completed media is stored in the library directory configured during setup:
+
+- **Movies**: Stored as single video files
+- **TV Shows**: Organized by show name with season folders
+- **Subtitles**: Stored alongside video files as .vtt sidecar files
+- **Metadata**: Cached TMDB images stored in the library/images directory
+
+Files remain in your library even after the torrent completes, allowing fast playback without re-downloading.

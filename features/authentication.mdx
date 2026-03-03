@@ -1,0 +1,168 @@
+---
+title: Authentication
+description: User authentication system powered by better-auth with email/password sign-in
+---
+
+Plank uses [better-auth](https://www.better-auth.com/) for user authentication, providing secure email and password-based registration and login.
+
+## Authentication System
+
+The authentication system is configured in `src/lib/server/auth.ts:9` with the following features:
+
+- **Email and password authentication** - Users sign in with email and password credentials
+- **Session management** - Sessions last 7 days with daily updates (`src/lib/server/auth.ts:37-39`)
+- **SQLite database** - User data stored via Drizzle ORM adapter
+- **Organization plugin** - Multi-tenant profile support through better-auth's organization plugin
+
+### Database Tables
+
+The authentication system uses these core tables (defined in `src/lib/server/db/schema.ts`):
+
+| Table | Purpose | Key Fields |
+|-------|---------|------------|
+| `user` | User accounts | `id`, `name`, `email`, `role`, `emailVerified` |
+| `session` | Active user sessions | `id`, `token`, `userId`, `expiresAt`, `activeOrganizationId` |
+| `account` | OAuth/credential data | `id`, `userId`, `providerId`, `password` |
+| `verification` | Email verification tokens | `id`, `identifier`, `value`, `expiresAt` |
+
+## User Roles
+
+Plank supports two user roles defined in the `user` table (`src/lib/server/db/schema.ts:14-16`):
+
+- **admin** - Full system access, can create profiles (organizations)
+- **user** - Standard user with profile membership access
+
+### First User Admin Promotion
+
+The first user to register automatically becomes an admin (`src/lib/server/auth.ts:43-51`):
+
+```typescript
+databaseHooks: {
+  user: {
+    create: {
+      before: async (user) => {
+        // First user to register becomes admin
+        const existingUsers = db.select({ id: schema.user.id })
+          .from(schema.user).limit(1).all();
+        return {
+          data: {
+            ...user,
+            role: existingUsers.length === 0 ? 'admin' : 'user',
+          },
+        };
+      },
+    },
+  },
+}
+```
+
+All subsequent users register as standard users.
+
+## Account Creation
+
+<Steps>
+  <Step title="Navigate to registration">
+    Visit `/register` to access the account creation page.
+  </Step>
+  
+  <Step title="Provide account details">
+    Enter the following information:
+    - **Name** - Full name for display
+    - **Email** - Valid email address (must be unique)
+    - **Password** - Minimum 8 characters
+    - **Confirm Password** - Must match password field
+    
+    The registration form validates password length client-side (`src/routes/(auth)/register/+page.svelte:26-30`).
+  </Step>
+  
+  <Step title="Submit registration">
+    Click "Create Account" to submit the form. The system:
+    - Creates a new user account
+    - Assigns the `admin` role if this is the first user, otherwise `user`
+    - Automatically signs you in
+    - Redirects to `/profiles` or the original requested page
+  </Step>
+  
+  <Step title="First user: Complete onboarding">
+    If you're the first user (now an admin), you'll be redirected to `/onboarding` to configure your Plank instance before creating profiles.
+  </Step>
+</Steps>
+
+## Signing In
+
+<Steps>
+  <Step title="Navigate to login">
+    Visit `/login` to access the sign-in page.
+  </Step>
+  
+  <Step title="Enter credentials">
+    Provide your email address and password.
+  </Step>
+  
+  <Step title="Submit and redirect">
+    Click "Sign In". On successful authentication, you'll be redirected to:
+    - The `/profiles` page to select a profile
+    - Your original requested page if you were redirected to login
+  </Step>
+</Steps>
+
+## Session Management
+
+Sessions are configured with these settings (`src/lib/server/auth.ts:36-39`):
+
+- **Expiration**: 7 days (604,800 seconds)
+- **Update age**: 1 day - sessions are refreshed daily during active use
+- **Active organization**: Sessions track the currently selected profile via `activeOrganizationId`
+
+### Session Data
+
+Each session stores (`src/lib/server/db/schema.ts:42-67`):
+
+- Session token (unique)
+- User ID (foreign key to user table)
+- Expiration timestamp
+- IP address and user agent for security tracking
+- Active organization ID (current profile context)
+
+## Security Features
+
+### Password Requirements
+
+- Minimum 8 characters enforced client-side and server-side
+- Passwords are hashed before storage (handled by better-auth)
+
+### Environment Variables
+
+Authentication requires these environment variables:
+
+```bash
+BETTER_AUTH_SECRET=your-secret-key-here
+BETTER_AUTH_URL=http://localhost:5173
+```
+
+- `BETTER_AUTH_SECRET` - Secret key for signing tokens and sessions
+- `BETTER_AUTH_URL` - Base URL for authentication callbacks
+
+### Protected Routes
+
+Routes check authentication via `locals.user` in server load functions:
+
+```typescript
+if (!locals.user) {
+  throw redirect(302, '/login');
+}
+```
+
+Unauthorized users are redirected to `/login` with a return URL parameter.
+
+## API Endpoint
+
+The better-auth API is mounted at `/api/auth/[...all]` (`src/routes/api/auth/[...all]/+server.ts`) and handles:
+
+- Sign up requests
+- Sign in requests  
+- Session validation
+- Organization operations
+- Invitation acceptance
+
+The client-side auth client (`$lib/auth-client`) communicates with this endpoint for all authentication operations.

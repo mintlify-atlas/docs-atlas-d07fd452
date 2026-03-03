@@ -1,0 +1,272 @@
+---
+title: Profiles & Invitations
+description: Multi-tenant organization system with member management and email invitations
+---
+
+Plank uses a multi-tenant profile system powered by better-auth's organization plugin. Profiles (called "organizations" in the database) allow you to separate media libraries between different groups of users.
+
+## Profile System Overview
+
+Profiles provide complete isolation between different groups of users:
+
+- **Separate media libraries** - Each profile has its own collection of movies and TV shows
+- **Member-based access** - Users must be members of a profile to access its content
+- **Admin-managed** - Only the global admin can create profiles
+- **Multi-membership** - Users can be members of multiple profiles
+
+### Database Schema
+
+The profile system uses three core tables (`src/lib/server/db/schema.ts`):
+
+#### Organization Table
+
+Stores profile configuration (`src/lib/server/db/schema.ts:26-40`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | text | Primary key |
+| `name` | text | Display name |
+| `slug` | text | Unique URL-friendly identifier |
+| `logo` | text | Optional logo URL |
+| `color` | text | Profile theme color (default: `#6366F1`) |
+| `metadata` | text | JSON field for additional data |
+| `createdAt` | timestamp | Creation timestamp |
+| `updatedAt` | timestamp | Last update timestamp |
+
+#### Member Table
+
+Tracks user memberships (`src/lib/server/db/schema.ts:117-133`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | text | Primary key |
+| `userId` | text | Foreign key to user |
+| `organizationId` | text | Foreign key to organization |
+| `role` | text | Member role (default: `member`) |
+| `createdAt` | timestamp | Membership start timestamp |
+
+The table enforces unique memberships via a composite unique index on `(userId, organizationId)`.
+
+#### Invitation Table
+
+Manages pending profile invitations (`src/lib/server/db/schema.ts:135-154`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | text | Primary key |
+| `email` | text | Invitee email address |
+| `inviterId` | text | User who sent the invitation |
+| `organizationId` | text | Profile being invited to |
+| `role` | text | Role to assign (default: `member`) |
+| `status` | text | Invitation status (default: `pending`) |
+| `expiresAt` | timestamp | Expiration timestamp |
+| `createdAt` | timestamp | Creation timestamp |
+| `updatedAt` | timestamp | Last update timestamp |
+
+## Creating Profiles
+
+Only users with the `admin` role can create profiles (`src/lib/server/auth.ts:58-66`):
+
+```typescript
+organization({
+  allowUserToCreateOrganization: async (user) => {
+    // Only the global admin can create profiles (organizations)
+    const dbUser = db
+      .select({ role: schema.user.role })
+      .from(schema.user)
+      .where(eq(schema.user.id, user.id))
+      .get();
+    return dbUser?.role === 'admin';
+  },
+})
+```
+
+<Steps>
+  <Step title="Sign in as admin">
+    Ensure you're logged in with an account that has the `admin` role. The first registered user is automatically promoted to admin.
+  </Step>
+  
+  <Step title="Navigate to profile management">
+    Go to `/profiles/manage` to access the profile management interface. This page is admin-only (`src/routes/(app)/profiles/manage/+page.server.ts:12-15`).
+  </Step>
+  
+  <Step title="Create new profile">
+    Provide the required profile information:
+    - **Name** - Display name for the profile
+    - **Slug** - Unique URL-friendly identifier
+    - **Logo** (optional) - Image URL for the profile avatar
+    - **Color** (optional) - Hex color code for theming (defaults to `#6366F1`)
+  </Step>
+  
+  <Step title="Profile created">
+    The new profile appears in the profiles list at `/profiles` for all users to see. However, only members can access its content.
+  </Step>
+</Steps>
+
+## Profile Selection
+
+When users sign in, they're redirected to `/profiles` to select which profile to use (`src/routes/(app)/profiles/+page.server.ts:7-53`).
+
+### Profile Display Logic
+
+- **Admin users** see all profiles with a "Manage" option
+- **Standard users** see all profiles but can only access those they're members of
+- **No profiles exist** - Admins are redirected to `/onboarding` to set up the instance
+
+### Active Profile Tracking
+
+The selected profile is stored in the user's session as `activeOrganizationId` (`src/lib/server/db/schema.ts:59-61`):
+
+```typescript
+activeOrganizationId: text('active_organization_id').references(() => organization.id, {
+  onDelete: 'set null',
+})
+```
+
+This allows the application to scope all media queries to the current profile context.
+
+## Managing Members
+
+Members are users who have access to a specific profile's media library.
+
+### Member Roles
+
+The `member` table includes a `role` field (defaulting to `member`). While better-auth supports custom roles, Plank's current implementation uses a simple member system.
+
+### Adding Members via Invitation
+
+Admins and profile owners can invite users by email:
+
+<Steps>
+  <Step title="Send invitation">
+    Create an invitation with:
+    - Target email address
+    - Profile to invite them to
+    - Role to assign (default: `member`)
+    - Expiration time
+    
+    The invitation is stored with status `pending`.
+  </Step>
+  
+  <Step title="User receives invitation">
+    The invitee receives an email with an invitation link containing the invitation ID.
+  </Step>
+  
+  <Step title="Accept invitation">
+    When the user clicks the link, they're directed to `/accept-invitation/[id]` (`src/routes/accept-invitation/[id]/+page.server.ts`).
+    
+    If not logged in, they're redirected to `/login` with a return URL.
+  </Step>
+  
+  <Step title="Invitation processed">
+    Once authenticated, the system:
+    - Validates the invitation (checks expiration, status)
+    - Creates a member record linking the user to the organization
+    - Updates the invitation status
+    - Redirects the user to `/` (home page)
+  </Step>
+</Steps>
+
+### Invitation Acceptance Flow
+
+The invitation acceptance handler (`src/routes/accept-invitation/[id]/+page.server.ts:5-39`):
+
+```typescript
+export const load: PageServerLoad = async ({ params, locals, url, request }) => {
+  const invitationId = params.id;
+
+  if (!locals.user) {
+    // Redirect to login with return URL
+    throw redirect(302, `/login?redirectTo=${encodeURIComponent(url.pathname)}`);
+  }
+
+  try {
+    // Accept invitation
+    await auth.api.acceptInvitation({
+      body: {
+        invitationId,
+      },
+      headers: request.headers,
+    });
+
+    // Redirect to home on success
+    throw redirect(302, '/');
+  } catch (error) {
+    // Handle errors
+    const errorMessage = 'Failed to accept invitation. It may be invalid or expired.';
+    return {
+      error: errorMessage,
+    };
+  }
+};
+```
+
+## Media Isolation
+
+Each media item is scoped to an organization via the `organizationId` field (`src/lib/server/db/schema.ts:167`):
+
+```typescript
+organizationId: text('organization_id').references(() => organization.id, { 
+  onDelete: 'set null' 
+})
+```
+
+### Unique Constraint
+
+The `media` table enforces unique content per profile using a composite unique index (`src/lib/server/db/schema.ts:197`):
+
+```typescript
+uniqueIndex('media_organization_infohash_unique').on(table.organizationId, table.infohash)
+```
+
+This prevents duplicate torrents within the same profile while allowing different profiles to have the same content.
+
+## Profile Statistics
+
+Profile pages display member counts by aggregating the `member` table (`src/routes/(app)/profiles/manage/+page.server.ts:20-29`):
+
+```typescript
+const memberCounts = db
+  .select({
+    organizationId: schema.member.organizationId,
+    count: sql<number>`count(*)`,
+  })
+  .from(schema.member)
+  .groupBy(schema.member.organizationId)
+  .all();
+```
+
+This provides:
+- Total member count per profile
+- User's membership status
+- Access control visibility
+
+## Access Control
+
+### Admin Privileges
+
+Admins have special access (`src/lib/server/auth.ts:58-66`):
+
+- Create new profiles
+- View all profiles at `/profiles/manage`
+- Manage members across all profiles
+
+### Standard User Access
+
+Standard users:
+
+- See all profiles but only access those they're members of
+- Cannot create new profiles
+- Must be invited to join profiles
+
+### Onboarding Flow
+
+When a fresh instance has no profiles, admins are automatically redirected to `/onboarding` (`src/routes/(app)/profiles/+page.server.ts:17-20`):
+
+```typescript
+if (allOrgs.length === 0 && isAdmin) {
+  throw redirect(302, '/onboarding');
+}
+```
+
+This ensures the admin sets up the instance before users can join.

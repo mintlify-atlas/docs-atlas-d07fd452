@@ -1,0 +1,120 @@
+---
+title: API Overview
+description: Overview of the Plank API for streaming torrents
+---
+
+The Plank API provides a RESTful interface for managing and streaming media content. All endpoints require authentication and profile selection.
+
+## Base URL
+
+All API endpoints are prefixed with `/api`.
+
+## Authentication
+
+All endpoints require an authenticated user session. Requests without valid authentication will return a `401 Unauthorized` response.
+
+```json
+{
+  "message": "Unauthorized"
+}
+```
+
+## Profile/Organization Selection
+
+Most endpoints require an active organization (profile) to be selected. Requests without an active profile will return a `400 Bad Request` response:
+
+```json
+{
+  "message": "No active profile selected"
+}
+```
+
+## Response Format
+
+All API responses use JSON format with appropriate HTTP status codes:
+
+- `200 OK` - Request succeeded
+- `201 Created` - Resource created successfully
+- `204 No Content` - Request succeeded with no response body
+- `400 Bad Request` - Invalid request parameters
+- `401 Unauthorized` - Authentication required
+- `404 Not Found` - Resource not found
+- `500 Internal Server Error` - Server error
+- `503 Service Unavailable` - Service temporarily unavailable
+
+## API Sections
+
+The Plank API is organized into the following sections:
+
+### Media
+
+Manage your media library, including adding torrents, tracking download progress, and retrieving media information.
+
+- Add media from magnet links
+- List library items
+- Track download progress
+- Stream video content
+- Manage playback position
+
+### Browse
+
+Discover trending and popular content from TMDB, search for torrents, and resolve magnet links.
+
+- Browse trending/popular movies and TV shows
+- Get detailed media information
+- Resolve torrents for movies and TV seasons
+- Fetch TV season information
+
+### Subtitles
+
+Search, download, and manage subtitles for your media.
+
+- Auto-discover local subtitles
+- Search OpenSubtitles
+- Download subtitle files
+- Get available subtitle tracks
+
+## Common Data Types
+
+### MediaType
+
+```typescript
+type MediaType = 'movie' | 'tv';
+```
+
+### DownloadStatus
+
+```typescript
+type DownloadStatus = 'added' | 'initializing' | 'downloading' | 'ready' | 'completed' | 'error';
+```
+
+### Media Object
+
+```typescript
+interface Media {
+  id: string;
+  userId: string;
+  organizationId: string;
+  type: MediaType;
+  title: string;
+  year: number | null;
+  posterUrl: string | null;
+  backdropUrl: string | null;
+  overview: string | null;
+  magnetLink: string;
+  infohash: string;
+  tmdbId: number | null;
+  runtime: number | null;
+  genres: string | null;
+  originalLanguage: string | null;
+  certification: string | null;
+  totalSeasons: number | null;
+  status: DownloadStatus | null;
+  progress: number;
+  filePath: string | null;
+  playPosition: number | null;
+  playDuration: number | null;
+  addedAt: string;
+  lastPlayedAt: string | null;
+}
+```

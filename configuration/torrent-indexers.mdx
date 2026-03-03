@@ -1,0 +1,288 @@
+---
+title: 'Torrent indexers'
+description: 'Configure torrent indexers in Prowlarr for content search'
+keywords: ['indexers', 'prowlarr', 'torrents', 'yts', '1337x', 'pirate bay', 'nyaa', 'eztv']
+icon: 'magnifying-glass'
+---
+
+<Info>
+Torrent indexers are the sources that provide torrent search results. Plank uses Prowlarr to search across multiple indexers simultaneously.
+</Info>
+
+## What are torrent indexers?
+
+Torrent indexers are websites that catalog torrent files and magnet links. When you search for content in Plank, Prowlarr queries your configured indexers and returns the best matching torrents based on quality, seeders, and trusted release groups.
+
+## Indexer packages
+
+Choose an indexer package based on your content preferences. You can configure multiple indexers from different packages.
+
+### General Entertainment Package
+
+Recommended for most users seeking movies, TV shows, and general content:
+
+<Steps>
+  <Step title="YTS">
+    **Best for**: Movies only, high quality, small file sizes
+
+    YTS specializes in compressed movie releases with excellent quality-to-size ratios. Ideal for users with limited storage or bandwidth.
+  </Step>
+
+  <Step title="1337x">
+    **Best for**: Well-established tracker with mixed content types
+
+    Large variety of content including movies, TV shows, games, and software. Note that availability can be unstable at times.
+  </Step>
+
+  <Step title="The Pirate Bay">
+    **Best for**: Largest library of content
+
+    The most comprehensive torrent index available. Requires careful verification of torrents due to the large volume of uploads.
+  </Step>
+</Steps>
+
+### Anime Fan Package
+
+Recommended for anime enthusiasts:
+
+<Steps>
+  <Step title="Nyaa.si">
+    **Best for**: Largest anime torrent repository
+
+    The primary source for anime torrents with the most comprehensive catalog and active community.
+  </Step>
+
+  <Step title="AnimeTosho">
+    **Best for**: Automated mirroring service with high reliability
+
+    Provides automated mirrors of anime releases with excellent uptime and organization.
+  </Step>
+
+  <Step title="AniDex">
+    **Best for**: Alternative anime source with good organization
+
+    Community-driven anime tracker with well-organized releases and active seeders.
+  </Step>
+</Steps>
+
+### TV Show Specialists
+
+Recommended for TV series focus:
+
+<Steps>
+  <Step title="EZTV">
+    **Best for**: TV series specialization with recent episodes
+
+    Focuses exclusively on TV shows with fast uploads of new episodes after airing.
+  </Step>
+
+  <Step title="TorrentGalaxy">
+    **Best for**: Good TV/movie mix with active community
+
+    Well-maintained tracker with a balance of TV shows and movies, plus active community moderation.
+  </Step>
+
+  <Step title="TorLock">
+    **Best for**: Verified torrents with fewer fake files
+
+    Emphasizes torrent verification to reduce fake or malicious files.
+  </Step>
+</Steps>
+
+## Adding indexers to Prowlarr
+
+<Steps>
+  <Step title="Access Prowlarr">
+    Open Prowlarr in your browser:
+
+    ```
+    http://localhost:9696
+    ```
+
+    If accessing remotely, replace `localhost` with your server's IP address.
+  </Step>
+
+  <Step title="Navigate to Indexers">
+    Click on **Indexers** in the left sidebar, then click **Add Indexer** in the top right.
+  </Step>
+
+  <Step title="Search for your indexer">
+    Use the search box to find the indexer you want to add (e.g., "YTS", "Nyaa", "EZTV").
+  </Step>
+
+  <Step title="Configure the indexer">
+    Click on the indexer from the search results. Most public indexers require minimal configuration:
+
+    - **Name**: Automatically filled (you can customize)
+    - **Enable**: Check this box
+    - **Redirect**: Leave unchecked
+    - **Priority**: Default is 25 (lower numbers = higher priority)
+    - **Tags**: Optional organizational tags
+
+    <Info>
+    Some indexers may require FlareSolverr for captcha solving. This is automatically configured if you're using the Docker setup.
+    </Info>
+  </Step>
+
+  <Step title="Test and save">
+    Click **Test** to verify the indexer is accessible, then click **Save**.
+
+    If the test fails:
+    - Check your internet connection
+    - Verify FlareSolverr is running: `http://localhost:8191`
+    - Try a different indexer URL (some domains may be blocked)
+  </Step>
+
+  <Step title="Verify in Plank">
+    Go to Plank's settings page (`http://localhost:3300/settings`) and ensure the Prowlarr API key is configured. Search for content to test your indexers.
+  </Step>
+</Steps>
+
+## Configuring quality filters
+
+Plank automatically filters torrents to ensure high-quality releases:
+
+### Automatic filtering
+
+The following low-quality releases are automatically excluded:
+
+- **CAM** / **HDCAM** - Camera recordings in theaters
+- **TS** / **HDTS** - Telesync recordings
+- **SCR** / **SCREENER** - Screening copies
+- **TC** / **TELECINE** - Telecine recordings
+- **R5** - Region 5 DVD releases
+
+### Quality scoring
+
+Torrents are automatically scored and ranked by:
+
+1. **Resolution**: 2160p > 1080p > UHD > 720p > 4K
+2. **Seeders**: More seeders = better availability (logarithmic scoring)
+3. **Trusted release groups**: Configured in Plank settings
+
+### Trusted release groups
+
+Plank prioritizes torrents from trusted release groups. The default trusted groups are:
+
+- **YTS** / **YIFY** - High-quality movie encodes with small file sizes
+- **.BONE.** - Reliable movie and TV releases
+- **x1337** - Quality releases from 1337x
+- **TVTEAM** - Trusted TV show releases
+
+You can customize this list in Plank's settings page (`/settings`).
+
+## Advanced configuration
+
+<AccordionGroup>
+  <Accordion title="Configuring FlareSolverr">
+    FlareSolverr automatically handles captchas for indexers that require them. It's pre-configured in the Docker setup.
+
+    To verify FlareSolverr is working:
+
+    ```bash
+    curl -X POST http://localhost:8191/v1 \
+      -H "Content-Type: application/json" \
+      -d '{"cmd":"request.get","url":"https://httpbin.org/ip","maxTimeout":60000}'
+    ```
+
+    You should receive a JSON response with `"status":"ok"`.
+  </Accordion>
+
+  <Accordion title="Setting minimum seeders">
+    In Plank's settings page (`/settings`), you can configure the minimum number of seeders required for a torrent to be considered:
+
+    - **Default**: 5 seeders
+    - **Low bandwidth**: Increase to 10-20 for better download speeds
+    - **Rare content**: Decrease to 1-3 to find hard-to-find content
+  </Accordion>
+
+  <Accordion title="Multiple Prowlarr instances">
+    To use multiple Prowlarr instances:
+
+    1. Configure each Prowlarr instance on different ports
+    2. Update `PROWLARR_URL` in Plank's settings to point to your primary instance
+    3. Use Prowlarr's sync apps feature to synchronize indexers across instances
+  </Accordion>
+
+  <Accordion title="Private indexers">
+    To add private torrent trackers:
+
+    1. Obtain an account and API key from the private tracker
+    2. In Prowlarr, search for the tracker by name
+    3. Enter your username and API key/passkey when prompted
+    4. Private trackers often have stricter ratio requirements - ensure you seed adequately
+
+    <Warning>
+    Private trackers have strict rules. Failing to maintain proper ratios can result in account suspension.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## Indexer troubleshooting
+
+<AccordionGroup>
+  <Accordion title="No search results">
+    **Solutions**:
+    - Ensure at least one indexer is configured in Prowlarr
+    - Verify TMDB API key is configured in Plank settings (search depends on TMDB)
+    - Check if indexers are enabled in Prowlarr
+    - Try different search terms
+    - Test indexers individually in Prowlarr's search page
+  </Accordion>
+
+  <Accordion title="Indexer configuration fails">
+    **Solutions**:
+    - Check your internet connection
+    - Verify the indexer's website is accessible in your region
+    - Try a different indexer URL (use mirror sites if available)
+    - Ensure FlareSolverr is running for indexers that require it
+    - Check Prowlarr logs: `docker compose logs prowlarr`
+  </Accordion>
+
+  <Accordion title="FlareSolverr not working">
+    **Solutions**:
+    - Verify FlareSolverr container is running: `docker ps`
+    - Check FlareSolverr logs: `docker compose logs flaresolverr`
+    - Restart FlareSolverr: `docker compose restart flaresolverr`
+    - Ensure FlareSolverr URL is correct in Prowlarr indexer proxy settings
+  </Accordion>
+
+  <Accordion title="Slow search results">
+    **Solutions**:
+    - Reduce the number of enabled indexers
+    - Increase indexer priority for faster sources
+    - Check if specific indexers are timing out (disable slow ones)
+    - Ensure adequate server resources (CPU, memory)
+  </Accordion>
+</AccordionGroup>
+
+## Legal and safety warnings
+
+<Warning>
+You are solely responsible for ensuring compliance with your local copyright laws. This software does not host, upload, or distribute any copyrighted material.
+</Warning>
+
+### Your responsibilities
+
+- **Copyright laws**: Check your country's copyright laws before using torrents
+- **File safety**: Verify torrent content before downloading - the developers have no control over torrent safety or legality
+- **Privacy protection**: Strongly consider using a torrent-ready VPN
+- **Verification**: Never download suspicious or unverified torrents
+
+### Security recommendations
+
+- Use a reputable VPN or tunnel service for all torrent activities
+- Scan downloaded files with antivirus software
+- Verify file contents and sizes match expectations
+- Never run executable files (`.exe`, `.bat`, `.scr`) from torrents unless explicitly intended (e.g., video games)
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="First-time setup" icon="rocket" href="/configuration/first-time-setup">
+    Complete Plank setup and configuration
+  </Card>
+  <Card title="API reference" icon="code" href="/api-reference">
+    Integrate Plank with other applications
+  </Card>
+</Columns>

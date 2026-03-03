@@ -1,0 +1,548 @@
+---
+title: 'Bare Metal Installation'
+description: 'Install Plank directly on your system without Docker'
+icon: 'server'
+---
+
+<Warning>
+  Bare metal installation requires manual setup of Prowlarr and FlareSolverr. We recommend [Docker deployment](/installation/docker) for easier setup.
+</Warning>
+
+## Prerequisites
+
+Before installing Plank on bare metal, ensure you have:
+
+- **Node.js**: Version 22 or higher
+- **npm**: Comes with Node.js
+- **ffmpeg**: For video transmuxing and subtitle processing
+- **Git**: For cloning the repository
+- **Prowlarr**: (Optional) For torrent search functionality
+- **FlareSolverr**: (Optional) For captcha solving on torrent sites
+
+### Install Dependencies
+
+<CodeGroup>
+```bash Ubuntu/Debian
+# Add Node.js 22 repository
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash -
+
+# Install dependencies
+sudo apt-get update
+sudo apt-get install -y nodejs ffmpeg git
+
+# Verify installations
+node -v
+npm -v
+ffmpeg -version
+```
+
+```bash Fedora/RHEL
+# Add Node.js repository
+curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
+
+# Install dependencies
+sudo dnf install -y nodejs ffmpeg git
+
+# Verify installations
+node -v
+npm -v
+ffmpeg -version
+```
+
+```bash Arch/Manjaro
+# Install dependencies
+sudo pacman -S --noconfirm nodejs npm ffmpeg git
+
+# Verify installations
+node -v
+npm -v
+ffmpeg -version
+```
+
+```bash macOS
+# Install Homebrew if not installed
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install dependencies
+brew install node ffmpeg git
+
+# Verify installations
+node -v
+npm -v
+ffmpeg -version
+```
+</CodeGroup>
+
+## Installation Steps
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/logscore/plank.git
+    cd plank
+    ```
+  </Step>
+
+  <Step title="Create environment file">
+    ```bash
+    cp .env.example .env
+    ```
+    
+    Edit `.env` with your configuration:
+    ```bash .env
+    DATABASE_URL=./plank.db
+    DATA_PATH=./data
+    TMDB_API_KEY=your_tmdb_api_key
+    
+    # Use localhost for bare metal
+    PROWLARR_URL=http://localhost:9696
+    PUBLIC_PROWLARR_URL=http://localhost:9696
+    PROWLARR_API_KEY=  # Get from Prowlarr settings
+    
+    BETTER_AUTH_SECRET=your-random-32-char-secret
+    BETTER_AUTH_URL=http://localhost:3300
+    
+    PORT=3300
+    ENABLE_FILE_STORAGE=true
+    ```
+    
+    Generate a secure auth secret:
+    ```bash
+    openssl rand -hex 32
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    npm install
+    ```
+  </Step>
+
+  <Step title="Build the application">
+    ```bash
+    npm run build
+    ```
+  </Step>
+
+  <Step title="Run database migrations">
+    ```bash
+    npx drizzle-kit migrate
+    ```
+  </Step>
+
+  <Step title="Start the server">
+    ```bash
+    node build
+    ```
+    
+    Or for development with live reload:
+    ```bash
+    npm run dev
+    ```
+  </Step>
+</Steps>
+
+Access Plank at `http://localhost:3300`.
+
+## Optional: Install Prowlarr & FlareSolverr
+
+For full torrent search functionality, install these services separately.
+
+### Prowlarr Installation
+
+<CodeGroup>
+```bash Ubuntu/Debian
+# Add Prowlarr repository
+sudo apt-get install -y curl sqlite3
+curl -o- https://prowlarr.servarr.com/v1/update/master/updatefile?os=linux | sudo bash
+
+# Prowlarr will be available at http://localhost:9696
+```
+
+```bash Docker (Alternative)
+docker run -d \
+  --name=prowlarr \
+  -e PUID=1000 \
+  -e PGID=1000 \
+  -e TZ=America/New_York \
+  -p 9696:9696 \
+  -v prowlarr-config:/config \
+  --restart unless-stopped \
+  lscr.io/linuxserver/prowlarr:latest
+```
+
+```bash macOS
+# Using Homebrew
+brew install prowlarr
+
+# Start Prowlarr
+brew services start prowlarr
+```
+</CodeGroup>
+
+See the [official Prowlarr installation guide](https://wiki.servarr.com/prowlarr/installation) for more options.
+
+### FlareSolverr Installation
+
+<CodeGroup>
+```bash Docker (Recommended)
+docker run -d \
+  --name=flaresolverr \
+  -p 8191:8191 \
+  -e LOG_LEVEL=info \
+  --restart unless-stopped \
+  ghcr.io/flaresolverr/flaresolverr:latest
+```
+
+```bash From Source
+# Install Python 3.11+
+sudo apt-get install python3 python3-pip
+
+# Clone and install FlareSolverr
+git clone https://github.com/FlareSolverr/FlareSolverr.git
+cd FlareSolverr
+pip install -r requirements.txt
+
+# Run FlareSolverr
+python src/flaresolverr.py
+```
+</CodeGroup>
+
+See the [FlareSolverr repository](https://github.com/flaresolverr/flaresolverr) for detailed instructions.
+
+### Configure Prowlarr
+
+<Steps>
+  <Step title="Access Prowlarr">
+    Navigate to `http://localhost:9696` and complete the initial setup.
+  </Step>
+
+  <Step title="Get API key">
+    - Go to **Settings** → **General**
+    - Copy the **API Key**
+    - Add it to your `.env` file:
+      ```bash
+      PROWLARR_API_KEY=your_prowlarr_api_key
+      ```
+  </Step>
+
+  <Step title="Add FlareSolverr">
+    - Go to **Settings** → **Indexers**
+    - Set **FlareSolverr URL**: `http://localhost:8191`
+  </Step>
+
+  <Step title="Add indexers">
+    Configure torrent indexers in Prowlarr:
+    - YTS (movies)
+    - 1337x (general)
+    - The Pirate Bay
+    - Nyaa.si (anime)
+    - EZTV (TV shows)
+  </Step>
+</Steps>
+
+## Running as a System Service
+
+### systemd (Linux)
+
+Create a systemd service file for automatic startup:
+
+<Steps>
+  <Step title="Create service file">
+    ```bash
+    sudo nano /etc/systemd/system/plank.service
+    ```
+    
+    Add the following content:
+    ```ini /etc/systemd/system/plank.service
+    [Unit]
+    Description=Plank Media Server
+    After=network.target
+
+    [Service]
+    Type=simple
+    User=your_username
+    WorkingDirectory=/path/to/plank
+    ExecStartPre=/usr/bin/npx drizzle-kit migrate
+    ExecStart=/usr/bin/node build
+    Restart=on-failure
+    RestartSec=5
+    EnvironmentFile=/path/to/plank/.env
+
+    [Install]
+    WantedBy=multi-user.target
+    ```
+    
+    Replace:
+    - `your_username` with your system username
+    - `/path/to/plank` with the full path to your Plank installation
+  </Step>
+
+  <Step title="Enable and start service">
+    ```bash
+    # Reload systemd
+    sudo systemctl daemon-reload
+    
+    # Enable service to start on boot
+    sudo systemctl enable plank
+    
+    # Start service now
+    sudo systemctl start plank
+    ```
+  </Step>
+
+  <Step title="Manage the service">
+    ```bash
+    # Check status
+    sudo systemctl status plank
+    
+    # View logs
+    sudo journalctl -u plank -f
+    
+    # Restart
+    sudo systemctl restart plank
+    
+    # Stop
+    sudo systemctl stop plank
+    ```
+  </Step>
+</Steps>
+
+### PM2 (Cross-Platform)
+
+PM2 is a process manager that works on Linux, macOS, and Windows.
+
+<Steps>
+  <Step title="Install PM2">
+    ```bash
+    npm install -g pm2
+    ```
+  </Step>
+
+  <Step title="Create PM2 ecosystem file">
+    ```bash
+    nano ecosystem.config.js
+    ```
+    
+    Add:
+    ```javascript ecosystem.config.js
+    module.exports = {
+      apps: [{
+        name: 'plank',
+        script: 'build/index.js',
+        cwd: '/path/to/plank',
+        env_file: '.env',
+        instances: 1,
+        autorestart: true,
+        watch: false,
+        max_memory_restart: '1G',
+        error_file: './logs/err.log',
+        out_file: './logs/out.log',
+        log_file: './logs/combined.log',
+        time: true
+      }]
+    }
+    ```
+  </Step>
+
+  <Step title="Start with PM2">
+    ```bash
+    # Start application
+    pm2 start ecosystem.config.js
+    
+    # Save PM2 configuration
+    pm2 save
+    
+    # Generate startup script
+    pm2 startup
+    ```
+  </Step>
+
+  <Step title="Manage with PM2">
+    ```bash
+    # Check status
+    pm2 status
+    
+    # View logs
+    pm2 logs plank
+    
+    # Restart
+    pm2 restart plank
+    
+    # Stop
+    pm2 stop plank
+    
+    # Monitor
+    pm2 monit
+    ```
+  </Step>
+</Steps>
+
+## Build and Development Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm install` | Install dependencies |
+| `npm run build` | Build for production |
+| `npm run dev` | Start development server with live reload |
+| `npm run preview` | Preview production build |
+| `npm run check` | Run type checking and linting |
+| `npx drizzle-kit migrate` | Run database migrations |
+| `npx drizzle-kit generate` | Generate new migrations |
+| `node build` | Start production server |
+
+## Updating Plank
+
+<Steps>
+  <Step title="Stop the server">
+    ```bash
+    # systemd
+    sudo systemctl stop plank
+    
+    # PM2
+    pm2 stop plank
+    
+    # Manual
+    # Press Ctrl+C in terminal
+    ```
+  </Step>
+
+  <Step title="Pull latest changes">
+    ```bash
+    cd /path/to/plank
+    git pull
+    ```
+  </Step>
+
+  <Step title="Rebuild">
+    ```bash
+    npm install
+    npm run build
+    npx drizzle-kit migrate
+    ```
+  </Step>
+
+  <Step title="Restart server">
+    ```bash
+    # systemd
+    sudo systemctl start plank
+    
+    # PM2
+    pm2 restart plank
+    
+    # Manual
+    node build
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Build fails with memory errors">
+    Increase Node.js memory limit:
+    ```bash
+    export NODE_OPTIONS="--max-old-space-size=4096"
+    npm run build
+    ```
+  </Accordion>
+
+  <Accordion title="Database migration fails">
+    Check database file permissions:
+    ```bash
+    ls -la plank.db
+    chmod 644 plank.db
+    ```
+    
+    If the database is corrupted, restore from backup or delete and recreate:
+    ```bash
+    rm plank.db
+    npx drizzle-kit migrate
+    ```
+  </Accordion>
+
+  <Accordion title="Can't connect to Prowlarr">
+    Verify Prowlarr is running:
+    ```bash
+    curl http://localhost:9696
+    ```
+    
+    Check the API key in `.env` matches Prowlarr's settings:
+    - Go to Prowlarr → **Settings** → **General**
+    - Copy the API key
+    - Update `PROWLARR_API_KEY` in `.env`
+    - Restart Plank
+  </Accordion>
+
+  <Accordion title="Port already in use">
+    Check what's using the port:
+    ```bash
+    # Linux/macOS
+    sudo lsof -i :3300
+    
+    # Or use a different port
+    PORT=8080 node build
+    ```
+  </Accordion>
+
+  <Accordion title="FFmpeg not found">
+    Verify ffmpeg installation:
+    ```bash
+    which ffmpeg
+    ffmpeg -version
+    ```
+    
+    If not found, install it:
+    ```bash
+    # Ubuntu/Debian
+    sudo apt-get install ffmpeg
+    
+    # macOS
+    brew install ffmpeg
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Performance Optimization
+
+### Node.js Optimization
+```bash
+# Increase max memory
+export NODE_OPTIONS="--max-old-space-size=4096"
+
+# Enable production mode
+export NODE_ENV=production
+```
+
+### Database Optimization
+```bash
+# Optimize SQLite database
+sqlite3 plank.db "VACUUM;"
+sqlite3 plank.db "PRAGMA optimize;"
+```
+
+### Systemd Resource Limits
+Add to your systemd service file:
+```ini
+[Service]
+MemoryLimit=2G
+CPUQuota=200%
+IOWeight=500
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" icon="gear" href="/installation/environment-variables">
+    Complete configuration reference
+  </Card>
+  <Card title="Prowlarr Setup" icon="magnifying-glass" href="/configuration/indexers">
+    Configure torrent indexers
+  </Card>
+  <Card title="Security Guide" icon="shield" href="/advanced/security">
+    VPN setup and best practices
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/advanced/troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>

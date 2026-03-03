@@ -1,0 +1,364 @@
+---
+title: Subtitles
+description: Multi-language subtitle support with automatic discovery
+icon: closed-captioning
+---
+
+Plank provides comprehensive subtitle support with automatic discovery, OpenSubtitles integration, and manual uploads.
+
+## Subtitle Sources
+
+Plank can load subtitles from multiple sources:
+
+<CardGroup cols={2}>
+  <Card title="Embedded Subtitles" icon="file-video">
+    Automatically extracted from video files (MKV, MP4). Supports multiple language tracks.
+  </Card>
+  
+  <Card title="Sidecar Files" icon="file-text">
+    .srt, .vtt, or .ass files stored alongside videos in the library directory.
+  </Card>
+  
+  <Card title="OpenSubtitles" icon="cloud-download">
+    Search and download subtitles from OpenSubtitles.com using TMDB metadata.
+  </Card>
+  
+  <Card title="Manual Upload" icon="upload">
+    Upload your own subtitle files in VTT or SRT format.
+  </Card>
+</CardGroup>
+
+## Automatic Subtitle Discovery
+
+When you play a video, Plank automatically discovers available subtitles.
+
+### Discovery Process
+
+1. **Check Database**: Looks for previously discovered subtitles
+2. **Scan Embedded**: Extracts subtitle tracks from video file metadata
+3. **Scan Sidecar**: Looks for .vtt, .srt, .ass files in same directory
+4. **Background Fetch**: Continues discovery in background while you watch
+
+### Supported Formats
+
+#### Embedded Formats
+- **SubRip (SRT)**: Extracted from video containers
+- **ASS/SSA**: Advanced SubStation Alpha (styling preserved)
+- **WebVTT**: Native web format
+- **DVB Subtitles**: Bitmap-based subtitles
+
+#### Sidecar Formats
+- **WebVTT (.vtt)**: Preferred format, works natively in browser
+- **SubRip (.srt)**: Auto-converted to VTT on server
+- **ASS (.ass)**: Advanced styling, converted to VTT
+
+### File Naming Conventions
+
+Sidecar subtitle files are detected with these patterns:
+
+```
+movie.mp4
+movie.en.vtt          // English subtitles
+movie.es.srt          // Spanish subtitles
+movie.en.forced.vtt   // Forced English subtitles
+
+show-s01e01.mkv
+show-s01e01.en.vtt
+show-s01e01.en.sdh.vtt  // SDH (Hearing Impaired)
+```
+
+Language codes use ISO 639-1 format (en, es, fr, de, etc.).
+
+## Subtitle Selection
+
+The video player provides easy subtitle selection:
+
+### Player Subtitle Menu
+
+Access subtitles from the player controls:
+1. Click the **CC** button in player controls
+2. View list of available subtitle tracks
+3. Select desired language
+4. Subtitles activate immediately
+
+### Subtitle Track Display
+
+Each track shows:
+- **Language**: Full language name (e.g., "English", "Spanish")
+- **Source**: Where it came from (embedded, sidecar, OpenSubtitles)
+- **Type**: Regular, forced, or SDH (hearing impaired)
+- **Format**: VTT or SRT
+
+### Default Subtitles
+
+Subtitles marked as default (from embedded tracks) are automatically selected on playback.
+
+## OpenSubtitles Integration
+
+Plank can search and download subtitles from OpenSubtitles.com.
+
+### Configuration
+
+To enable OpenSubtitles:
+
+1. Navigate to **Settings**
+2. Enter OpenSubtitles API key
+3. (Optional) Enter username and password for premium features
+4. Save settings
+
+Get an API key: [OpenSubtitles API](https://www.opensubtitles.com/api)
+
+### Searching for Subtitles
+
+From the media detail page:
+
+1. Click **Find Subtitles**
+2. Select target languages (defaults to English)
+3. View search results
+4. Click **Download** on desired subtitle
+
+For TV shows, specify season and episode number.
+
+### Search Criteria
+
+OpenSubtitles searches use:
+- **TMDB ID**: Most accurate matching
+- **Title + Year**: Fallback if no TMDB ID
+- **Season + Episode**: For TV shows
+- **Language**: Filter by desired languages
+
+### Download Process
+
+When you download a subtitle:
+
+1. Plank fetches subtitle file from OpenSubtitles
+2. Converts to WebVTT format (if needed)
+3. Saves to library directory as sidecar file
+4. Adds entry to subtitles database table
+5. Immediately available in player
+
+## Manual Subtitle Upload
+
+You can upload subtitle files directly.
+
+### Upload Workflow
+
+1. Navigate to media detail page
+2. Click **Upload Subtitle**
+3. Select .vtt or .srt file
+4. Choose language
+5. (Optional) Mark as default or forced
+6. Click **Upload**
+
+The subtitle is saved alongside the video file and immediately available.
+
+### Supported Upload Formats
+
+- **WebVTT (.vtt)**: Uploaded as-is
+- **SubRip (.srt)**: Auto-converted to VTT
+- **ASS/SSA (.ass/.ssa)**: Converted to VTT (styling may be lost)
+
+## Subtitle Management
+
+Manage your subtitle collection from the media detail page.
+
+### Viewing Subtitles
+
+See all subtitles for a media item:
+1. Open media detail page
+2. Scroll to "Subtitles" section
+3. View list of available tracks
+
+### Deleting Subtitles
+
+Remove unwanted subtitle tracks:
+1. Click delete icon next to subtitle
+2. Confirm deletion
+3. Subtitle file removed from library
+
+Note: You cannot delete embedded subtitles, only sidecar and downloaded ones.
+
+### Setting Default Subtitle
+
+Mark a subtitle as default:
+1. Click "Set as Default" on subtitle track
+2. Player will auto-select this track on playback
+
+### Forced Subtitles
+
+"Forced" subtitles display only for foreign language parts:
+- Useful for movies with mixed languages
+- Only shows when non-English dialogue appears
+- Mark as forced during upload or download
+
+## Database Schema
+
+Subtitles are stored in the `subtitles` table:
+
+```sql
+subtitles:
+- id: unique identifier
+- mediaId: links to media item
+- episodeId: (optional) links to specific episode
+- language: ISO 639-1 code (e.g., "en")
+- label: display name (e.g., "English")
+- source: embedded | sidecar | opensubtitles | manual
+- format: vtt | srt
+- filePath: path to subtitle file (for sidecar)
+- streamIndex: stream index (for embedded)
+- isDefault: auto-select flag
+- isForced: forced subtitle flag
+```
+
+### Subtitle Tracks API
+
+The player fetches subtitle tracks from:
+
+```
+GET /api/media/{id}/subtitles?episodeId={episodeId}
+```
+
+Returns array of subtitle tracks formatted for Vidstack player.
+
+## Subtitle Format Conversion
+
+Plank automatically converts subtitles to WebVTT for browser compatibility.
+
+### Why WebVTT?
+
+WebVTT (Web Video Text Tracks) is the standard format for HTML5 video:
+- Native browser support
+- No conversion needed at runtime
+- Supports styling and positioning
+- Standardized timing format
+
+### Conversion Process
+
+When a non-VTT subtitle is added:
+
+1. **SRT → VTT**: Converts timestamp format and headers
+2. **ASS → VTT**: Extracts text, may lose styling
+3. **Embedded → VTT**: Extracts from video container
+
+Converted files are cached in the library directory.
+
+### FFmpeg Integration
+
+Embedded subtitle extraction uses FFmpeg:
+
+```bash
+ffmpeg -i video.mkv -map 0:s:0 -c:s webvtt output.vtt
+```
+
+Plank automatically runs FFmpeg for embedded subtitle extraction.
+
+## Performance Optimization
+
+### Lazy Loading
+
+Subtitle discovery runs in the background:
+- Player starts immediately
+- Subtitles appear as they're discovered
+- No blocking on slow file scans
+
+### Caching
+
+Discovered subtitles are cached:
+- Database stores subtitle metadata
+- Prevents re-scanning files
+- Instant loading on subsequent plays
+
+### Concurrent Discovery
+
+Multiple subtitle sources checked in parallel:
+- Embedded track extraction
+- Sidecar file scanning
+- OpenSubtitles search (if enabled)
+
+## Advanced Features
+
+### SDH (Subtitles for Deaf and Hard of Hearing)
+
+SDH subtitles include:
+- Sound effect descriptions [door slams]
+- Speaker identification
+- Music and ambient noise notation
+
+Mark subtitles as SDH during upload or search.
+
+### Multi-Language Support
+
+Plank supports subtitles in any language:
+- ISO 639-1 language codes
+- Full language names in player UI
+- Search by multiple languages simultaneously
+- No limit on number of subtitle tracks
+
+### Subtitle Synchronization
+
+If subtitles are out of sync:
+- Use player's subtitle offset feature (if available)
+- Download alternate subtitle file
+- Manually edit .vtt file timing (advanced)
+
+## Troubleshooting
+
+### Subtitles Not Showing
+
+**Check subtitle file location**:
+- Must be in same directory as video
+- Filename must match video filename
+- Extension must be .vtt, .srt, or .ass
+
+**Check database**:
+- Subtitle may not be discovered yet
+- Refresh the page to trigger discovery
+- Check browser console for errors
+
+### Embedded Subtitles Missing
+
+**FFmpeg not installed**:
+- Verify FFmpeg is available on server
+- Check server logs for FFmpeg errors
+
+**Unsupported codec**:
+- Some subtitle codecs may not be supported
+- Extract manually and upload as sidecar
+
+### OpenSubtitles Not Working
+
+**API key invalid**:
+- Verify API key in settings
+- Check OpenSubtitles account status
+- API key may be rate-limited
+
+**No TMDB ID**:
+- Media must have TMDB metadata
+- Re-add media to fetch TMDB ID
+- Manually search on OpenSubtitles.com
+
+### Subtitle Encoding Issues
+
+**Wrong character encoding**:
+- Most subtitles should be UTF-8
+- Convert to UTF-8 before uploading
+- Use tool like `iconv` on Linux/Mac
+
+### Sync Issues
+
+**Subtitles out of sync**:
+- Download different subtitle file
+- Manually adjust .vtt timestamps
+- Use subtitle editing tool (Subtitle Edit, Aegisub)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Streaming" icon="play" href="/features/streaming">
+    Learn about Plank's video streaming capabilities
+  </Card>
+  
+  <Card title="Media Library" icon="library" href="/features/media-library">
+    Manage your collection of movies and TV shows
+  </Card>
+</CardGroup>

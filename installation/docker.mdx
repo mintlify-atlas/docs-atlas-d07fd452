@@ -1,0 +1,415 @@
+---
+title: 'Docker Installation'
+description: 'Deploy Plank with Docker Compose including Prowlarr and FlareSolverr'
+icon: 'docker'
+---
+
+<Note>
+  Docker deployment is **highly recommended** as it automatically sets up Plank, Prowlarr (torrent search), and FlareSolverr (captcha solving) with proper networking.
+</Note>
+
+## Quick Start
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/logscore/plank.git
+    cd plank
+    ```
+  </Step>
+
+  <Step title="Create environment file">
+    ```bash
+    cp .env.example .env
+    ```
+    
+    Edit `.env` with your settings (see [Environment Variables](/installation/environment-variables)).
+  </Step>
+
+  <Step title="Start services">
+    ```bash
+    docker compose -f docker/docker-compose.yml --env-file .env up -d
+    ```
+  </Step>
+
+  <Step title="Verify deployment">
+    Check that all services are running:
+    ```bash
+    docker ps
+    ```
+    
+    You should see three containers: `plank`, `prowlarr`, and `flaresolverr`.
+  </Step>
+</Steps>
+
+## Services
+
+The Docker Compose setup includes three services:
+
+### Plank (Main Application)
+- **Ports**: `3300` (web interface), `6881` (torrent client)
+- **Volumes**: 
+  - `plank-db` - SQLite database
+  - `plank-data` - Downloaded media files
+  - `./media` - Media library (optional, configurable via `MEDIA_PATH`)
+- **Health Check**: HTTP endpoint at `http://localhost:3000/health`
+
+### Prowlarr (Torrent Indexer)
+- **Port**: `9696`
+- **Image**: `lscr.io/linuxserver/prowlarr:latest`
+- **Volume**: `prowlarr-config` - Configuration and API keys
+- **Purpose**: Searches torrent indexers and provides results to Plank
+
+### FlareSolverr (Captcha Solver)
+- **Port**: `8191`
+- **Image**: `ghcr.io/flaresolverr/flaresolverr:latest`
+- **Purpose**: Bypasses captchas on torrent sites
+
+## Docker Compose Configuration
+
+The complete `docker-compose.yml` configuration:
+
+```yaml docker/docker-compose.yml
+services:
+  plank:
+    container_name: plank
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "3300:3000"
+      - "6881:6881/tcp"
+      - "6881:6881/udp"
+    environment:
+      - ENABLE_FILE_STORAGE=true
+      - DATABASE_URL=/app/db/plank.db
+      - TMDB_API_KEY=${TMDB_API_KEY}
+      - PROWLARR_URL=http://prowlarr:9696
+      - PROWLARR_API_KEY=${PROWLARR_API_KEY:-}
+      - OPENSUBTITLES_API_KEY=${OPENSUBTITLES_API_KEY:-}
+      - OPENSUBTITLES_USERNAME=${OPENSUBTITLES_USERNAME:-}
+      - OPENSUBTITLES_PASSWORD=${OPENSUBTITLES_PASSWORD:-}
+      - FLARESOLVERR_URL=http://flaresolverr:8191
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL}
+      - ORIGIN=${ORIGIN:-http://localhost:3300}
+      - PORT=3000
+      - HOST=0.0.0.0
+      - PROWLARR_CONFIG_PATH=/prowlarr-config/config.xml
+    volumes:
+      - plank-db:/app/db
+      - plank-data:/app/data
+      - ${MEDIA_PATH:-./media}:/app/data/library
+      - prowlarr-config:/prowlarr-config:ro
+    depends_on:
+      prowlarr:
+        condition: service_started
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-America/New_York}
+    volumes:
+      - prowlarr-config:/config
+    ports:
+      - "9696:9696"
+    restart: unless-stopped
+    depends_on:
+      - flaresolverr
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_HTML=${LOG_HTML:-false}
+      - CAPTCHA_SOLVER=${CAPTCHA_SOLVER:-none}
+      - TZ=${TZ:-America/New_York}
+    ports:
+      - "8191:8191"
+    restart: unless-stopped
+
+volumes:
+  plank-db:
+  plank-data:
+  prowlarr-config:
+```
+
+## Essential Environment Variables
+
+<Warning>
+  The `ORIGIN` variable is **required** for Docker deployments to prevent CSRF errors. It must match the URL you use to access Plank.
+</Warning>
+
+Minimal `.env` for Docker:
+
+```bash .env
+# TMDB API (required for metadata)
+TMDB_API_KEY=your_tmdb_api_key
+
+# Authentication (auto-generated secret)
+BETTER_AUTH_SECRET=your-random-32-char-secret
+BETTER_AUTH_URL=http://localhost:3300
+
+# CSRF Protection (must match browser URL)
+ORIGIN=http://localhost:3300
+
+# Prowlarr (API key auto-configured)
+PROWLARR_API_KEY=
+
+# Optional: Subtitles
+OPENSUBTITLES_API_KEY=
+OPENSUBTITLES_USERNAME=
+OPENSUBTITLES_PASSWORD=
+```
+
+## Management Commands
+
+### Start Services
+```bash
+docker compose -f docker/docker-compose.yml --env-file .env up -d
+```
+
+### Stop Services
+```bash
+docker compose -f docker/docker-compose.yml down
+```
+
+### View Logs
+```bash
+# All services
+docker compose -f docker/docker-compose.yml logs -f
+
+# Specific service
+docker compose -f docker/docker-compose.yml logs -f plank
+docker compose -f docker/docker-compose.yml logs -f prowlarr
+```
+
+### Restart Services
+```bash
+# All services
+docker compose -f docker/docker-compose.yml restart
+
+# Specific service
+docker compose -f docker/docker-compose.yml restart plank
+```
+
+### Rebuild Image
+```bash
+docker compose -f docker/docker-compose.yml up -d --build
+```
+
+### Update to Latest Version
+```bash
+git pull
+docker compose -f docker/docker-compose.yml up -d --build
+```
+
+## Volumes and Data
+
+### Named Volumes
+Docker automatically manages these volumes:
+
+- `plank-db` - SQLite database at `/app/db/plank.db`
+- `plank-data` - Downloaded torrent files at `/app/data`
+- `prowlarr-config` - Prowlarr configuration and API keys
+
+### Host Bind Mount
+The media library can be mounted from your host:
+
+```yaml
+volumes:
+  - ${MEDIA_PATH:-./media}:/app/data/library
+```
+
+Set `MEDIA_PATH` in `.env` to customize:
+```bash
+MEDIA_PATH=/mnt/media
+```
+
+### Backup Data
+```bash
+# Backup database
+docker cp plank:/app/db/plank.db ./plank-backup.db
+
+# Backup volumes
+docker run --rm -v plank-db:/data -v $(pwd):/backup alpine tar czf /backup/plank-db-backup.tar.gz /data
+```
+
+## Networking
+
+### Internal Docker Network
+Services communicate using Docker service names:
+
+- Plank → Prowlarr: `http://prowlarr:9696`
+- Plank → FlareSolverr: `http://flaresolverr:8191`
+
+<Note>
+  Use service names (e.g., `prowlarr`) for internal communication, not `localhost`.
+</Note>
+
+### Port Mapping
+| Service | Internal Port | Host Port |
+|---------|---------------|----------|
+| Plank Web | 3000 | 3300 |
+| Plank Torrent | 6881 | 6881 |
+| Prowlarr | 9696 | 9696 |
+| FlareSolverr | 8191 | 8191 |
+
+### Custom Ports
+To change host ports, edit `docker-compose.yml`:
+
+```yaml
+ports:
+  - "8080:3000"  # Access Plank on port 8080
+```
+
+Update `ORIGIN` accordingly:
+```bash
+ORIGIN=http://localhost:8080
+```
+
+## Prowlarr Configuration
+
+<Steps>
+  <Step title="Access Prowlarr">
+    Navigate to `http://localhost:9696` after starting the containers.
+  </Step>
+
+  <Step title="Add indexers">
+    Go to **Indexers** → **Add Indexer** and configure your preferred torrent sources:
+    - YTS (movies, small file sizes)
+    - 1337x (general content)
+    - The Pirate Bay (largest library)
+    - Nyaa.si (anime)
+    - EZTV (TV shows)
+  </Step>
+
+  <Step title="Configure FlareSolverr (if needed)">
+    Some indexers require FlareSolverr for captcha solving:
+    - Go to **Settings** → **Indexers**
+    - Set FlareSolverr URL: `http://flaresolverr:8191`
+  </Step>
+
+  <Step title="Verify API key">
+    Plank automatically reads the API key from Prowlarr's config. To verify:
+    - Go to Plank **Settings**
+    - Check that Prowlarr is connected
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title='"Cross-site POST form submissions are forbidden"'>
+    This CSRF error occurs when `ORIGIN` doesn't match your browser URL.
+    
+    **Solution:**
+    ```bash .env
+    # If accessing via IP
+    ORIGIN=http://192.168.1.100:3300
+    
+    # If accessing via domain
+    ORIGIN=https://plank.yourdomain.com
+    ```
+    
+    Restart after changing:
+    ```bash
+    docker compose -f docker/docker-compose.yml restart plank
+    ```
+  </Accordion>
+
+  <Accordion title="Containers fail to start">
+    Check for port conflicts:
+    ```bash
+    # Check if ports are in use
+    sudo netstat -tlnp | grep -E '3300|9696|8191|6881'
+    ```
+    
+    View detailed logs:
+    ```bash
+    docker compose -f docker/docker-compose.yml logs
+    ```
+  </Accordion>
+
+  <Accordion title="Can't connect to Prowlarr">
+    Verify Prowlarr is running:
+    ```bash
+    docker ps | grep prowlarr
+    ```
+    
+    Test connectivity from Plank container:
+    ```bash
+    docker exec plank curl http://prowlarr:9696
+    ```
+    
+    Check Prowlarr logs:
+    ```bash
+    docker compose -f docker/docker-compose.yml logs prowlarr
+    ```
+  </Accordion>
+
+  <Accordion title="Permission errors on volumes">
+    The Plank container runs as the default user. For custom user IDs:
+    
+    ```yaml docker-compose.yml
+    plank:
+      user: "1000:1000"  # Add this line
+    ```
+    
+    Or set ownership on host:
+    ```bash
+    sudo chown -R 1000:1000 ./media
+    ```
+  </Accordion>
+
+  <Accordion title="High memory usage">
+    Monitor container resources:
+    ```bash
+    docker stats
+    ```
+    
+    Limit memory in `docker-compose.yml`:
+    ```yaml
+    plank:
+      deploy:
+        resources:
+          limits:
+            memory: 2G
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Production Deployment
+
+For production deployments:
+
+1. **Use a reverse proxy** (Nginx, Traefik, Caddy) for HTTPS
+2. **Set strong secrets**:
+   ```bash
+   BETTER_AUTH_SECRET=$(openssl rand -hex 32)
+   ```
+3. **Configure firewall** to restrict access to ports 9696, 8191
+4. **Enable restart policies** (already configured in docker-compose.yml)
+5. **Set up regular backups** of volumes
+6. **Use a VPN** for torrent traffic (see [Security](/configuration/security))
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" icon="gear" href="/installation/environment-variables">
+    Complete reference for all configuration options
+  </Card>
+  <Card title="Security Best Practices" icon="shield" href="/advanced/security">
+    Configure secure deployments and VPN protection
+  </Card>
+  <Card title="Torrent Indexers" icon="magnifying-glass" href="/configuration/torrent-indexers">
+    Configure Prowlarr indexers for best results
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/advanced/troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>

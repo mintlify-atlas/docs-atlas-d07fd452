@@ -1,0 +1,306 @@
+---
+title: Browse API
+description: Discover and search for media content
+---
+
+The Browse API provides access to trending and popular content from TMDB, torrent resolution, and detailed media information.
+
+## Browse Trending/Popular
+
+Get trending or popular movies and TV shows from TMDB.
+
+```http
+GET /api/browse
+```
+
+### Query Parameters
+
+<ParamField query="type" type="string" default="trending">
+  Browse type: `trending` or `popular`
+</ParamField>
+
+<ParamField query="filter" type="string" default="all">
+  Media filter: `all`, `movie`, or `tv`
+</ParamField>
+
+<ParamField query="page" type="number" default="1">
+  Page number for pagination
+</ParamField>
+
+### Response
+
+<ResponseField name="items" type="array">
+  Array of media items with basic information
+</ResponseField>
+
+<ResponseField name="page" type="number">
+  Current page number
+</ResponseField>
+
+<ResponseField name="totalPages" type="number">
+  Total number of pages available
+</ResponseField>
+
+```json
+{
+  "items": [
+    {
+      "tmdbId": 27205,
+      "title": "Inception",
+      "mediaType": "movie",
+      "year": 2010,
+      "posterUrl": "https://image.tmdb.org/...",
+      "backdropUrl": "https://image.tmdb.org/...",
+      "overview": "A thief who steals corporate secrets...",
+      "voteAverage": 8.4
+    }
+  ],
+  "page": 1,
+  "totalPages": 500
+}
+```
+
+### Behavior
+
+- `trending` returns trending content for the current day
+- `popular` returns popular movies or TV shows (not both)
+- Results are returned quickly without enrichment
+- Use `/api/browse/details` for lazy enrichment
+
+## Get Browse Item Details
+
+Lazy enrichment endpoint that returns IMDB IDs, certifications, and cached magnet links for a batch of TMDB items.
+
+```http
+POST /api/browse/details
+```
+
+### Request Body
+
+<ParamField body="items" type="array" required>
+  Array of items to enrich (max 40)
+</ParamField>
+
+Each item should contain:
+
+<ParamField body="items[].tmdbId" type="number" required>
+  TMDB ID
+</ParamField>
+
+<ParamField body="items[].mediaType" type="MediaType" required>
+  Media type: `movie` or `tv`
+</ParamField>
+
+### Example Request
+
+```json
+{
+  "items": [
+    { "tmdbId": 27205, "mediaType": "movie" },
+    { "tmdbId": 1396, "mediaType": "tv" }
+  ]
+}
+```
+
+### Response
+
+<ResponseField name="details" type="array">
+  Array of enriched details for each item
+</ResponseField>
+
+```json
+{
+  "details": [
+    {
+      "tmdbId": 27205,
+      "imdbId": "tt1375666",
+      "certification": "PG-13",
+      "magnetLink": "magnet:?xt=urn:btih:..."
+    },
+    {
+      "tmdbId": 1396,
+      "imdbId": "tt0903747",
+      "certification": "TV-MA"
+    }
+  ]
+}
+```
+
+### Features
+
+- Batch processing up to 40 items
+- Server-side caching prevents duplicate TMDB requests
+- Includes cached magnet links when available
+- Returns null fields when data is unavailable
+
+## Resolve Movie Torrent
+
+Resolve a movie to a high-quality magnet link via Prowlarr.
+
+```http
+POST /api/browse/resolve
+```
+
+### Request Body
+
+<ParamField body="imdbId" type="string">
+  IMDB ID (e.g., "tt1375666")
+</ParamField>
+
+<ParamField body="tmdbId" type="number">
+  TMDB ID (used to resolve IMDB ID if not provided)
+</ParamField>
+
+<ParamField body="title" type="string">
+  Movie title for cache storage
+</ParamField>
+
+At least one of `imdbId` or `tmdbId` is required.
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether a torrent was found
+</ResponseField>
+
+<ResponseField name="cached" type="boolean">
+  Whether the result came from cache
+</ResponseField>
+
+<ResponseField name="torrent" type="object">
+  Torrent information
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message if not successful
+</ResponseField>
+
+```json
+{
+  "success": true,
+  "cached": false,
+  "torrent": {
+    "imdbId": "tt1375666",
+    "tmdbId": 27205,
+    "magnetLink": "magnet:?xt=urn:btih:...",
+    "infohash": "abc123...",
+    "title": "Inception.2010.1080p.BluRay.x264-GROUP",
+    "quality": "1080p",
+    "releaseGroup": "GROUP",
+    "size": 2147483648,
+    "seeders": 42
+  }
+}
+```
+
+### Quality Filtering
+
+- Searches via Prowlarr indexers
+- Filters for high-quality releases from trusted groups
+- Caches successful results for faster future lookups
+- Returns `success: false` if no suitable torrent found
+
+## Resolve TV Season Torrent
+
+Resolve a TV show season to a magnet link for a season pack.
+
+```http
+POST /api/browse/resolve-season
+```
+
+### Request Body
+
+<ParamField body="tmdbId" type="number" required>
+  TMDB ID of the TV show
+</ParamField>
+
+<ParamField body="seasonNumber" type="number" required>
+  Season number (e.g., 1, 2, 3)
+</ParamField>
+
+<ParamField body="showTitle" type="string" required>
+  TV show title for search
+</ParamField>
+
+<ParamField body="imdbId" type="string">
+  IMDB ID (auto-resolved if not provided)
+</ParamField>
+
+### Example Request
+
+```json
+{
+  "tmdbId": 1396,
+  "seasonNumber": 1,
+  "showTitle": "Breaking Bad"
+}
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "torrent": {
+    "magnetLink": "magnet:?xt=urn:btih:...",
+    "infohash": "def456...",
+    "title": "Breaking.Bad.S01.1080p.BluRay.x264-GROUP",
+    "quality": "1080p",
+    "releaseGroup": "GROUP",
+    "size": 15728640000,
+    "seeders": 28
+  }
+}
+```
+
+### Features
+
+- Searches for complete season packs
+- Filters out individual episode torrents
+- Auto-resolves IMDB ID from TMDB ID
+- Returns `success: false` if no season pack found
+
+## Get TV Seasons Info
+
+Get detailed season information for a TV show from TMDB.
+
+```http
+GET /api/browse/seasons/{tmdbId}
+```
+
+### Path Parameters
+
+<ParamField path="tmdbId" type="number" required>
+  TMDB ID of the TV show
+</ParamField>
+
+### Response
+
+```json
+{
+  "seasons": [
+    {
+      "seasonNumber": 1,
+      "name": "Season 1",
+      "overview": "The first season follows...",
+      "episodeCount": 7,
+      "airDate": "2008-01-20",
+      "posterUrl": "https://image.tmdb.org/..."
+    },
+    {
+      "seasonNumber": 2,
+      "name": "Season 2",
+      "overview": "In the second season...",
+      "episodeCount": 13,
+      "airDate": "2009-03-08",
+      "posterUrl": "https://image.tmdb.org/..."
+    }
+  ]
+}
+```
+
+### Use Cases
+
+- Display available seasons before downloading
+- Show season metadata and posters
+- Determine which seasons to download

@@ -1,0 +1,404 @@
+---
+title: Media API
+description: Manage your media library and stream content
+---
+
+The Media API allows you to manage your personal media library, add content from magnet links, track downloads, and stream video.
+
+## List Media
+
+Retrieve all media items in your library.
+
+```http
+GET /api/media
+```
+
+### Query Parameters
+
+<ParamField query="type" type="MediaType">
+  Filter by media type: `movie` or `tv`
+</ParamField>
+
+### Response
+
+Returns an array of media objects.
+
+```json
+[
+  {
+    "id": "clx123456",
+    "type": "movie",
+    "title": "Inception",
+    "year": 2010,
+    "status": "completed",
+    "progress": 100,
+    "tmdbId": 27205,
+    "posterUrl": "https://...",
+    "runtime": 148,
+    "addedAt": "2024-03-15T10:30:00Z"
+  }
+]
+```
+
+## Add Media
+
+Add a new media item from a magnet link.
+
+```http
+POST /api/media
+```
+
+### Request Body
+
+<ParamField body="magnetLink" type="string" required>
+  The magnet URI to download
+</ParamField>
+
+<ParamField body="type" type="MediaType">
+  Media type: `movie` or `tv`. Auto-detected if not provided
+</ParamField>
+
+<ParamField body="tmdbId" type="number">
+  TMDB ID for metadata enrichment
+</ParamField>
+
+<ParamField body="title" type="string">
+  Media title (from browse view)
+</ParamField>
+
+<ParamField body="year" type="number">
+  Release year
+</ParamField>
+
+<ParamField body="posterUrl" type="string">
+  Poster image URL
+</ParamField>
+
+<ParamField body="backdropUrl" type="string">
+  Backdrop image URL
+</ParamField>
+
+<ParamField body="overview" type="string">
+  Media description/overview
+</ParamField>
+
+<ParamField body="genres" type="string[]">
+  Array of genre names
+</ParamField>
+
+<ParamField body="certification" type="string">
+  Content rating (e.g., "PG-13", "TV-MA")
+</ParamField>
+
+### Response
+
+Returns the created media object with `201 Created` status.
+
+```json
+{
+  "id": "clx123456",
+  "type": "movie",
+  "title": "Inception",
+  "magnetLink": "magnet:?xt=urn:btih:...",
+  "status": "added",
+  "progress": 0
+}
+```
+
+### Behavior Notes
+
+- If a media item with the same infohash already exists in the profile, returns the existing item (200 OK)
+- For TV shows with the same `tmdbId`, creates a new download record linked to the existing show
+- Automatically starts the download in the background
+- Fetches metadata from TMDB if not provided
+- Downloads and caches poster/backdrop images
+
+## Get Media Details
+
+Retrieve details for a specific media item.
+
+```http
+GET /api/media/{id}
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Media ID
+</ParamField>
+
+### Response
+
+```json
+{
+  "id": "clx123456",
+  "type": "movie",
+  "title": "Inception",
+  "year": 2010,
+  "status": "ready",
+  "progress": 100,
+  "filePath": "/library/movies/Inception.mp4",
+  "tmdbId": 27205,
+  "runtime": 148,
+  "playPosition": 3600,
+  "playDuration": 8880
+}
+```
+
+## Delete Media
+
+Delete a media item and all associated files.
+
+```http
+DELETE /api/media/{id}
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Media ID
+</ParamField>
+
+### Response
+
+Returns `204 No Content` on success.
+
+### Behavior
+
+- Cancels any active downloads
+- Deletes all files from the file system
+- Removes database records
+
+## Search Library
+
+Search your media library by title.
+
+```http
+GET /api/media/search
+```
+
+### Query Parameters
+
+<ParamField query="q" type="string" required>
+  Search query (minimum 2 characters)
+</ParamField>
+
+<ParamField query="type" type="MediaType">
+  Filter by type: `movie` or `tv`
+</ParamField>
+
+### Response
+
+```json
+[
+  {
+    "id": "clx123456",
+    "title": "Inception",
+    "type": "movie",
+    "year": 2010
+  }
+]
+```
+
+## Get Download Progress
+
+Get real-time download status and progress.
+
+```http
+GET /api/media/{id}/progress
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Media ID
+</ParamField>
+
+### Response
+
+<ResponseField name="status" type="DownloadStatus">
+  Current download status
+</ResponseField>
+
+<ResponseField name="progress" type="number">
+  Download progress (0-100)
+</ResponseField>
+
+<ResponseField name="downloadSpeed" type="number">
+  Current download speed in bytes/second
+</ResponseField>
+
+<ResponseField name="uploadSpeed" type="number">
+  Current upload speed in bytes/second
+</ResponseField>
+
+<ResponseField name="peers" type="number">
+  Number of connected peers
+</ResponseField>
+
+<ResponseField name="isActive" type="boolean">
+  Whether the download is currently active
+</ResponseField>
+
+<ResponseField name="filePath" type="string | null">
+  Path to the downloaded file (when ready)
+</ResponseField>
+
+<ResponseField name="error" type="string | undefined">
+  Error message if status is "error"
+</ResponseField>
+
+```json
+{
+  "status": "downloading",
+  "progress": 45.2,
+  "downloadSpeed": 2097152,
+  "uploadSpeed": 524288,
+  "peers": 12,
+  "isActive": true,
+  "filePath": null
+}
+```
+
+## Get Playback Position
+
+Get the saved playback position for a media item or episode.
+
+```http
+GET /api/media/{id}/position
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Media ID
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="episodeId" type="string">
+  Episode ID (for TV shows)
+</ParamField>
+
+### Response
+
+```json
+{
+  "position": 3600,
+  "duration": 8880
+}
+```
+
+## Update Playback Position
+
+Save playback progress for a media item or episode.
+
+```http
+PUT /api/media/{id}/position
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Media ID
+</ParamField>
+
+### Request Body
+
+<ParamField body="position" type="number" required>
+  Playback position in seconds
+</ParamField>
+
+<ParamField body="duration" type="number">
+  Total duration in seconds
+</ParamField>
+
+<ParamField body="episodeId" type="string">
+  Episode ID (for TV shows)
+</ParamField>
+
+### Response
+
+Returns `204 No Content` on success.
+
+## Stream Media
+
+Stream video content with support for range requests and transmuxing.
+
+```http
+GET /api/media/{id}/stream
+HEAD /api/media/{id}/stream
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Media ID
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="episodeId" type="string">
+  Episode ID (required for TV shows)
+</ParamField>
+
+### Headers
+
+<ParamField header="Range" type="string">
+  Byte range request (e.g., "bytes=0-1023")
+</ParamField>
+
+### Response
+
+Returns video stream with appropriate content type:
+
+- `200 OK` - Full file response
+- `206 Partial Content` - Range request response
+- `202 Accepted` - Video is still buffering
+
+### Features
+
+- Supports HTTP range requests for seeking
+- Automatic transmuxing of MKV/AVI to MP4
+- Streams directly from active torrents
+- Falls back to library files for completed downloads
+- Handles client disconnections gracefully
+
+## Get TV Seasons
+
+Get all seasons and episodes for a TV show.
+
+```http
+GET /api/media/{id}/seasons
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Media ID (must be type "tv")
+</ParamField>
+
+### Response
+
+```json
+[
+  {
+    "id": "season_123",
+    "mediaId": "clx123456",
+    "seasonNumber": 1,
+    "name": "Season 1",
+    "episodes": [
+      {
+        "id": "ep_456",
+        "seasonId": "season_123",
+        "episodeNumber": 1,
+        "title": "Pilot",
+        "filePath": "/library/tv/Show/S01E01.mkv",
+        "fileIndex": 0,
+        "playPosition": 0,
+        "playDuration": null
+      }
+    ]
+  }
+]
+```

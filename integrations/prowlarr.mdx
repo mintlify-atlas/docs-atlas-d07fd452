@@ -1,0 +1,264 @@
+---
+title: Prowlarr Integration
+description: Configure Prowlarr to search torrent indexers and find high-quality media
+---
+
+Prowlarr is a torrent indexer manager that aggregates search results from multiple torrent sites. Plank uses Prowlarr to find torrents for movies and TV shows across all your configured indexers.
+
+## Overview
+
+Prowlarr provides:
+
+- **Unified search** across multiple torrent indexers
+- **Automatic indexer management** with health checks
+- **Cloudflare bypass** via FlareSolverr integration
+- **Quality filtering** to exclude low-quality releases (CAM, TS, etc.)
+- **Release group filtering** to prioritize trusted uploaders
+
+Prowlarr is **required** for Plank's automatic torrent search features.
+
+## Installation
+
+### Docker (Recommended)
+
+Prowlarr is automatically included in Plank's Docker Compose setup:
+
+```bash
+docker compose -f docker/docker-compose.yml --env-file .env up -d
+```
+
+This starts:
+- **Plank** on port 3300
+- **Prowlarr** on port 9696
+- **FlareSolverr** on port 8191 (for Cloudflare bypass)
+
+### Bare Metal
+
+For manual installation, follow the [official Prowlarr installation guide](https://wiki.servarr.com/prowlarr/installation).
+
+After installing:
+
+1. Start Prowlarr (default port 9696)
+2. Set `PROWLARR_URL=http://localhost:9696` in your `.env` file
+3. Configure indexers through the Prowlarr web interface
+
+## Configuration
+
+### Automatic Setup (Docker)
+
+When running via Docker Compose, Plank automatically:
+
+1. Waits for Prowlarr to initialize
+2. Extracts the Prowlarr API key from the config file
+3. Configures FlareSolverr as an indexer proxy
+4. Updates Plank's environment with the API key
+
+**No manual configuration required for Docker deployments.**
+
+### Manual Setup
+
+<Steps>
+  <Step title="Get Prowlarr API key">
+    Open Prowlarr at `http://localhost:9696`
+    
+    Navigate to **Settings** → **General**
+    
+    Copy the **API Key** under the Security section.
+  </Step>
+
+  <Step title="Configure environment">
+    Add the API key to your `.env` file:
+    
+    ```bash
+    PROWLARR_URL=http://localhost:9696
+    PROWLARR_API_KEY=your_api_key_here
+    PUBLIC_PROWLARR_URL=http://localhost:9696  # Optional: for external access
+    ```
+  </Step>
+
+  <Step title="Add indexers">
+    In Prowlarr, go to **Indexers** → **Add Indexer**
+    
+    Choose indexers from the list and configure them. See [Indexer Packages](#indexer-packages) below for recommendations.
+  </Step>
+
+  <Step title="Test connection">
+    In Plank's settings page, verify the Prowlarr connection status.
+    
+    You should see a green indicator if configured correctly.
+  </Step>
+</Steps>
+
+## Indexer Packages
+
+Plank recommends these indexer packages based on content preferences:
+
+### General Entertainment
+
+**Best for**: Movies and TV shows
+
+- **YTS** - High-quality movies, small file sizes
+- **1337x** - Well-established, mixed content
+- **The Pirate Bay** - Largest library, requires verification
+
+### Anime Fans
+
+**Best for**: Anime series and movies
+
+- **Nyaa.si** - Largest anime torrent repository
+- **AnimeTosho** - Automated mirroring, high reliability
+- **AniDex** - Alternative source with good organization
+
+### TV Show Specialists
+
+**Best for**: TV series and recent episodes
+
+- **EZTV** - Specialized in TV series and new episodes
+- **TorrentGalaxy** - Good TV/movie mix, active community
+- **TorLock** - Verified torrents, fewer fake files
+
+### Adding Indexers via Plank
+
+Plank provides a UI to add recommended indexers directly from the settings page:
+
+1. Navigate to **Settings** → **Indexers**
+2. Select a package (General, Anime, or TV)
+3. Click **Install Package**
+4. Plank will configure all indexers in that package automatically
+
+## Search Quality Filters
+
+Prowlarr integration includes intelligent quality filtering:
+
+### Excluded Quality Patterns (`prowlarr.ts:44-56`)
+
+The following low-quality releases are automatically filtered:
+
+- **CAM** / **HDCAM** - Camera recordings from theaters
+- **TS** / **HDTS** / **TELESYNC** - Recorded from theater with audio jack
+- **TC** / **TELECINE** - From film reels before final edit
+- **SCR** / **SCREENER** / **DVDSCR** - Pre-release screeners
+- **R5** - Lower quality regional releases
+
+### Quality Scoring (`prowlarr.ts:62-68`)
+
+Torrents are ranked by quality:
+
+- **2160p** (4K UHD): 110 points
+- **1080p** (Full HD): 100 points
+- **UHD**: 80 points
+- **720p** (HD): 60 points
+- **4K**: 40 points
+
+**Seeder count** also factors into scoring (logarithmic scaling to avoid overweighting).
+
+### Best Torrent Selection (`prowlarr.ts:158-171`)
+
+Plank automatically selects torrents based on:
+
+1. Quality score (higher resolution preferred)
+2. Seeder count (more seeders = faster downloads)
+3. Trusted release groups (if configured)
+4. Minimum seeder threshold (default: 1)
+
+## TV Season Packs
+
+Prowlarr can search for complete TV season torrents:
+
+- Automatically filters out single episodes
+- Identifies season packs via patterns ("S01", "Season 1", "Complete")
+- Enforces minimum size requirement (1GB) to avoid fake season packs
+- Falls back to episode torrents if no season pack is available
+
+Season pack search is automatic when adding TV shows to your library.
+
+## Advanced Configuration
+
+### Trusted Release Groups
+
+Configure preferred release groups in settings:
+
+```bash
+# Comma-separated list of trusted groups
+TRUSTED_GROUPS=RARBG,YTS,EZTV,PSA,FLUX
+```
+
+Torrents from these groups are prioritized in search results.
+
+### Minimum Seeders
+
+Set the minimum number of seeders required:
+
+```bash
+MIN_SEEDERS=5
+```
+
+Torrents with fewer seeders are excluded from results (unless no other options exist).
+
+### FlareSolverr Proxy
+
+FlareSolverr bypasses Cloudflare protection on indexers. Configuration is automatic in Docker, or manual via:
+
+1. Install FlareSolverr: [Installation Guide](https://github.com/FlareSolverr/FlareSolverr)
+2. In Prowlarr, go to **Settings** → **Indexers** → **Indexer Proxies**
+3. Add FlareSolverr with URL `http://localhost:8191`
+4. Assign the proxy to indexers that require Cloudflare bypass
+
+## Troubleshooting
+
+### No search results
+
+**Problem**: Prowlarr searches return zero results.
+
+**Solutions**:
+- Verify at least one indexer is configured and enabled in Prowlarr
+- Check indexer health in Prowlarr (Settings → Indexers)
+- Test search directly in Prowlarr's search interface
+- Ensure TMDB API key is configured (required for search)
+- Check if FlareSolverr is running for Cloudflare-protected indexers
+
+### Connection refused
+
+**Problem**: Plank can't connect to Prowlarr.
+
+**Solutions**:
+- **Docker**: Use `PROWLARR_URL=http://prowlarr:9696` (service name)
+- **Bare metal**: Use `PROWLARR_URL=http://localhost:9696`
+- Verify Prowlarr is running: `curl http://localhost:9696/ping`
+- Check firewall rules aren't blocking port 9696
+- Ensure API key is correctly set in `.env` file
+
+### Magnet link resolution fails
+
+**Problem**: Downloads fail with "could not resolve magnet link" error.
+
+**Solutions**:
+- Some indexers return HTTP download URLs instead of magnet links
+- Plank automatically converts these, but network issues may prevent resolution
+- Check that Prowlarr is accessible from Plank's container/process
+- Verify the indexer is healthy in Prowlarr settings
+
+### Indexer setup fails
+
+**Problem**: Can't add indexers through Prowlarr or Plank.
+
+**Solutions**:
+- Check internet connectivity from the Prowlarr container/process
+- Try a different indexer URL (some indexers change domains frequently)
+- Verify FlareSolverr is running if the indexer uses Cloudflare
+- Check Prowlarr logs: `docker logs prowlarr` (Docker) or Prowlarr UI logs
+
+## Data Privacy
+
+Prowlarr search behavior:
+
+- Sends search queries to configured indexers
+- Does not transmit your library contents
+- Indexers may log search queries and IP addresses
+- **Strongly recommend using a VPN** for all torrent activities
+
+## Learn More
+
+- [Prowlarr Wiki](https://wiki.servarr.com/prowlarr)
+- [Prowlarr GitHub](https://github.com/Prowlarr/Prowlarr)
+- [FlareSolverr Integration](/integrations/flaresolverr)

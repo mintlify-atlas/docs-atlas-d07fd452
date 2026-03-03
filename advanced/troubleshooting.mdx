@@ -1,0 +1,154 @@
+---
+title: Troubleshooting
+description: Common issues and solutions for Plank
+---
+
+This guide covers common issues you may encounter when running Plank and their solutions.
+
+## Prowlarr Issues
+
+<AccordionGroup>
+  <Accordion title="Can't access Prowlarr API">
+    **Symptoms:** Unable to search for content, Prowlarr connection errors
+
+    **Solutions:**
+    - Check if containers are running:
+      ```bash
+      docker ps
+      ```
+    - Ensure you have the Prowlarr API key configured. Check the `/settings` page in Plank
+    - Verify port 9696 isn't blocked by firewall (if running outside the Docker network)
+    - Restart containers:
+      ```bash
+      docker compose restart
+      ```
+  </Accordion>
+
+  <Accordion title="Indexer configuration fails">
+    **Symptoms:** Unable to add or configure torrent indexers in Prowlarr
+
+    **Solutions:**
+    - Check your internet connection
+    - Try a different indexer URL (some indexers may be temporarily down)
+    - Ensure FlareSolverr is running (required for some indexers that use captchas)
+    - Verify FlareSolverr is accessible at `http://localhost:8191`
+  </Accordion>
+
+  <Accordion title="No search results">
+    **Symptoms:** Search returns empty results or errors
+
+    **Solutions:**
+    - Ensure you have a TMDB API key configured in `/settings`. Search results depend on TMDB metadata
+    - Verify at least one indexer is configured and tested in Prowlarr
+    - Check if FlareSolverr is running: `http://localhost:8191`
+    - Try different search terms or alternative spellings
+  </Accordion>
+</AccordionGroup>
+
+## Docker Issues
+
+<AccordionGroup>
+  <Accordion title="Container fails to start">
+    **Symptoms:** Docker containers won't start or exit immediately
+
+    **Solutions:**
+    - Check environment variables in your `.env` file for syntax errors
+    - Verify Docker is running:
+      ```bash
+      docker version
+      ```
+    - Check for port conflicts. Ensure ports 3300, 9696, and 8191 are available:
+      ```bash
+      netstat -tuln | grep -E '3300|9696|8191'
+      ```
+    - Sometimes distribution package mirrors are out of sync. Wait a few minutes and try again
+    - View container logs for specific errors:
+      ```bash
+      docker compose logs -f
+      ```
+  </Accordion>
+
+  <Accordion title="Cross-site POST form submissions are forbidden">
+    **Symptoms:** Error when trying to log in or submit forms
+
+    **Solution:**
+    - Ensure the `ORIGIN` environment variable in your `.env` file matches the URL you're using in your browser
+    - Examples:
+      - If accessing via `http://localhost:3300`, set `ORIGIN=http://localhost:3300`
+      - If accessing via `http://192.168.1.100:3300`, set `ORIGIN=http://192.168.1.100:3300`
+    - Restart the container after changing the `.env` file
+  </Accordion>
+
+  <Accordion title="Permission errors">
+    **Symptoms:** Cannot write to database or data directories
+
+    **Solutions:**
+    - Check volume permissions for media directories:
+      ```bash
+      ls -la ./data
+      ls -la plank.db
+      ```
+    - Ensure proper PUID/PGID if using custom user IDs in Docker
+    - Make sure the directories exist and are writable by the Docker user
+  </Accordion>
+</AccordionGroup>
+
+## Performance Issues
+
+<AccordionGroup>
+  <Accordion title="Slow torrent downloads">
+    **Symptoms:** Downloads are slower than expected
+
+    **Solutions:**
+    - Use an ethernet connection instead of WiFi for better stability
+    - Configure port forwarding for port 6881 (the exposed torrent client port) in your router settings
+    - Check if your VPN is throttling speeds or blocking torrent traffic entirely
+    - Verify tracker health in Prowlarr. Dead or slow trackers will impact performance
+    - Check the number of seeders for the torrent. More seeders = faster downloads
+  </Accordion>
+
+  <Accordion title="High memory usage">
+    **Symptoms:** System running slow, high RAM consumption
+
+    **Solutions:**
+    - Monitor Docker container resource usage:
+      ```bash
+      docker stats
+      ```
+    - Limit container resources in `docker-compose.yml` if needed:
+      ```yaml
+      deploy:
+        resources:
+          limits:
+            memory: 2G
+      ```
+    - Restart the containers to clear potential memory leaks:
+      ```bash
+      docker compose restart
+      ```
+    - Consider upgrading your system RAM if consistently hitting limits
+  </Accordion>
+</AccordionGroup>
+
+## Getting Help
+
+If you've tried the solutions above and still experience issues:
+
+1. **Check container logs:**
+   ```bash
+   docker compose logs -f
+   ```
+
+2. **Verify each service is accessible individually:**
+   - Plank: `http://localhost:3300`
+   - Prowlarr: `http://localhost:9696`
+   - FlareSolverr: `http://localhost:8191`
+
+3. **Test with minimal configuration first:**
+   - Start with just one indexer
+   - Test basic functionality before adding complexity
+
+4. **Check GitHub issues** for known problems and community solutions
+
+5. **Email the developer** at [lsreedercontact@gmail.com](mailto:lsreedercontact@gmail.com) if you genuinely can't figure it out
+   - **Note:** No AI-generated support requests. These will be ignored.

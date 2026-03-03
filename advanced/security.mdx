@@ -1,0 +1,207 @@
+---
+title: Security Best Practices
+description: Keep your Plank instance secure and private
+---
+
+<Warning>
+  This software is provided for educational and legitimate use only. Users are solely responsible for ensuring compliance with their local copyright laws and regulations.
+</Warning>
+
+## Legal Disclaimer
+
+Before using Plank, understand your responsibilities:
+
+- **Copyright Laws:** Check your country's copyright laws before using torrents
+- **File Safety:** The developers have **no control** over torrent content, safety, or legality
+- **Use at Your Own Discretion:** All torrent downloads are at your own risk
+- **Privacy Protection:** Strongly consider using a torrent-ready VPN for privacy protection
+
+## VPN Usage (Strongly Recommended)
+
+<Warning>
+  Using a VPN is **strongly recommended** for all torrent activities to protect your privacy.
+</Warning>
+
+When choosing and configuring a VPN:
+
+### VPN Selection Criteria
+
+- **No-logs policy:** Choose a VPN that doesn't keep activity logs
+- **Torrent-friendly:** Ensure the VPN allows P2P/torrent traffic
+- **Kill switch feature:** Protects you if the VPN connection drops
+- **Good speeds:** Some VPNs throttle speeds significantly
+- **Server locations:** Choose servers in privacy-friendly jurisdictions
+
+### VPN Configuration Tips
+
+- Always connect to the VPN **before** starting Plank
+- Enable the kill switch to prevent accidental exposure
+- Test for IP leaks using services like `ipleak.net`
+- Consider binding your torrent client to the VPN interface
+
+## Network Security
+
+### Docker Isolation
+
+<Tip>
+  Running Plank in Docker containers provides an additional security layer by isolating the application.
+</Tip>
+
+The Docker setup provides:
+- Process isolation from your host system
+- Network isolation between services
+- Controlled resource limits
+
+### Secure Remote Access
+
+<Warning>
+  Do NOT expose Plank directly to the internet without proper security measures.
+</Warning>
+
+For remote access, use one of these methods:
+
+#### Tailscale (Recommended)
+
+- Provides encrypted peer-to-peer connections
+- No port forwarding required
+- Zero-trust network architecture
+- Access your Plank instance from anywhere securely
+
+#### VPN Tunnel
+
+- Set up a VPN to your home network
+- Access Plank as if you're on the local network
+- Examples: WireGuard, OpenVPN
+
+#### Reverse Proxy with Authentication
+
+If you must expose Plank to the internet:
+- Use a reverse proxy (nginx, Caddy, Traefik)
+- Enable HTTPS with valid certificates
+- Implement additional authentication
+- Use fail2ban or similar for brute-force protection
+- Consider rate limiting
+
+## File Safety
+
+<Warning>
+  Never run executable files (.exe, .bat, .scr) from torrents unless you explicitly intend to and trust the source.
+</Warning>
+
+### Download Safety Checklist
+
+1. **Verify file types match expectations:**
+   - Video files should be `.mp4`, `.mkv`, `.avi`, etc.
+   - Audio files should be `.mp3`, `.flac`, `.m4a`, etc.
+   - Subtitles should be `.srt`, `.ass`, `.sub`, etc.
+
+2. **Check file sizes:**
+   - Suspiciously small files may be fake
+   - Executables disguised as videos are red flags
+
+3. **Scan downloads with antivirus:**
+   - Keep your antivirus software updated
+   - Scan downloaded files before opening
+   - Future Plank versions will include built-in scanning
+
+4. **Verify torrent sources:**
+   - Use trusted indexers
+   - Check torrent comments and ratings
+   - Look for verified uploaders
+   - Avoid torrents with no seeders or comments
+
+### Dangerous File Types
+
+Be extremely cautious with these extensions:
+- `.exe`, `.bat`, `.cmd`, `.scr` - Windows executables
+- `.dmg`, `.pkg`, `.app` - macOS executables  
+- `.deb`, `.rpm`, `.sh` - Linux executables
+- `.iso`, `.img` - Disk images that may contain executables
+- `.zip`, `.rar`, `.7z` - Archives that may contain malware
+
+## System Security
+
+### Keep Software Updated
+
+```bash
+# Update Plank
+cd plank
+git pull
+docker compose down
+docker compose -f docker/docker-compose.yml up -d --build
+
+# Update system packages
+sudo apt update && sudo apt upgrade  # Debian/Ubuntu
+sudo dnf update                       # Fedora
+sudo pacman -Syu                      # Arch
+```
+
+### Environment Variables
+
+<Warning>
+  Keep your `.env` file secure. It contains sensitive configuration including authentication secrets.
+</Warning>
+
+- Never commit `.env` files to version control
+- Use strong, random values for `BETTER_AUTH_SECRET`
+- Restrict file permissions:
+  ```bash
+  chmod 600 .env
+  ```
+- Regenerate secrets if they may have been compromised
+
+### Database Security
+
+- Keep your `plank.db` file secure
+- Regular backups in case of corruption or data loss
+- Restrict file permissions:
+  ```bash
+  chmod 600 plank.db
+  ```
+
+## User Account Security
+
+- Use strong, unique passwords for Plank accounts
+- Don't share accounts between users
+- Use organization features for multi-user setups
+- Assign appropriate admin permissions
+
+## Monitoring and Auditing
+
+### Check Container Logs
+
+Regularly review logs for suspicious activity:
+
+```bash
+# View all service logs
+docker compose logs -f
+
+# View specific service
+docker compose logs -f plank
+docker compose logs -f prowlarr
+```
+
+### Monitor Resource Usage
+
+```bash
+# Real-time container stats
+docker stats
+
+# Check disk usage
+df -h
+du -sh ./data
+```
+
+## Summary Checklist
+
+- [ ] VPN configured and active for torrent traffic
+- [ ] Running Plank in Docker containers
+- [ ] Using Tailscale or VPN for remote access
+- [ ] `.env` file permissions set to 600
+- [ ] System and software kept updated
+- [ ] Antivirus software installed and updated
+- [ ] Only downloading from trusted indexers
+- [ ] Verifying file types before opening
+- [ ] Never running executable files from torrents
+- [ ] Regular log monitoring
+- [ ] Database backups configured

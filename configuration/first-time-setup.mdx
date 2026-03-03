@@ -1,0 +1,250 @@
+---
+title: 'First-time setup'
+description: 'Complete guide to configuring Plank after installation'
+keywords: ['setup', 'configuration', 'first time', 'install', 'docker', 'prowlarr', 'flaresolverr']
+icon: 'rocket'
+---
+
+<Warning>
+This software is provided for educational and legitimate use only. You are solely responsible for ensuring compliance with your local copyright laws. Consider using a VPN for privacy protection when downloading torrents.
+</Warning>
+
+## Prerequisites
+
+Before setting up Plank, ensure you have:
+
+- Docker and Docker Compose installed (recommended method)
+- A TMDB API key for metadata ([get one here](https://www.themoviedb.org/settings/api))
+- (Optional) OpenSubtitles account for subtitle downloads ([sign up here](https://www.opensubtitles.com/consumers))
+
+<Note>
+The fastest way to get started is running the one-line deploy script, which handles nearly everything automatically.
+</Note>
+
+## Quick deploy
+
+For Linux systems, use the automated deployment script:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/logscore/plank/master/scripts/deploy.sh)
+```
+
+The script will install dependencies, clone the repository, configure your environment, and start the application.
+
+## Manual setup
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/logscore/plank.git
+    cd plank
+    ```
+  </Step>
+
+  <Step title="Create environment file">
+    Copy the example environment file:
+    
+    ```bash
+    cp .env.example .env
+    ```
+  </Step>
+
+  <Step title="Configure environment variables">
+    Edit your `.env` file with the following required settings:
+
+    ```bash .env
+    # Database
+    DATABASE_URL=./plank.db
+
+    # Where the files are saved when downloaded
+    DATA_PATH=./data
+
+    # Get yours here https://www.themoviedb.org/settings/api
+    TMDB_API_KEY=your_tmdb_api_key_here
+
+    # Prowlarr (Torrent Search)
+    PROWLARR_URL=http://prowlarr:9696  # Use 'prowlarr' for Docker, 'localhost:9696' for bare metal
+    PUBLIC_PROWLARR_URL=${PROWLARR_URL}
+    PROWLARR_API_KEY=  # Leave blank - configured automatically
+
+    # OpenSubtitles (Subtitle Downloads)
+    OPENSUBTITLES_API_KEY=
+    OPENSUBTITLES_USERNAME=
+    OPENSUBTITLES_PASSWORD=
+
+    # Authentication
+    BETTER_AUTH_SECRET=super-secret-32-char-string
+    BETTER_AUTH_URL=http://localhost:3300
+
+    # Reserved for future functionality
+    ENABLE_FILE_STORAGE=true
+
+    PORT=3300
+    ORIGIN=http://localhost:3300  # Required for Docker CSRF protection
+    ```
+
+    <Info>
+    The `ORIGIN` environment variable must match the URL you use to access Plank in your browser (e.g., `http://localhost:3300` or `http://192.168.1.100:3300`).
+    </Info>
+  </Step>
+
+  <Step title="Start the services">
+    <Tabs>
+      <Tab title="Docker (Recommended)">
+        Start all services including Prowlarr and FlareSolverr:
+
+        ```bash
+        docker compose -f docker/docker-compose.yml --env-file .env up -d
+        ```
+
+        This starts three containers:
+        - `plank` - The main application (port 3300)
+        - `prowlarr` - Torrent indexer search (port 9696)
+        - `flaresolverr` - Captcha solver for indexers (port 8191)
+      </Tab>
+
+      <Tab title="Bare Metal">
+        <Warning>
+        For bare metal installations, you must manually install and run Prowlarr and FlareSolverr. See [Prowlarr installation](https://wiki.servarr.com/prowlarr/installation) and [FlareSolverr](https://github.com/flaresolverr/flaresolverr) documentation.
+        </Warning>
+
+        ```bash
+        npm install
+        npm run build
+        npx drizzle-kit migrate
+        node build
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Verify installation">
+    Check that all containers are running:
+
+    ```bash
+    docker ps
+    ```
+
+    You should see `plank`, `prowlarr`, and `flaresolverr` in the output.
+  </Step>
+
+  <Step title="Access the application">
+    Open your browser and navigate to:
+
+    - **Plank**: http://localhost:3300
+    - **Prowlarr**: http://localhost:9696
+
+    Create your first user account in Plank to get started.
+  </Step>
+
+  <Step title="Configure torrent indexers">
+    After creating your account, configure torrent indexers in Prowlarr to enable content search. See the [torrent indexers guide](/configuration/torrent-indexers) for recommendations and setup instructions.
+  </Step>
+</Steps>
+
+## Environment variables reference
+
+| Variable | Description | Default |
+|----------|-------------|-------|
+| `DATABASE_URL` | Path to SQLite database | `./plank.db` |
+| `DATA_PATH` | Where downloaded files are saved | `./data` |
+| `TMDB_API_KEY` | TMDB API key for metadata | Required |
+| `PROWLARR_URL` | Prowlarr API URL | `http://localhost:9696` |
+| `PUBLIC_PROWLARR_URL` | Public-facing Prowlarr URL | Same as `PROWLARR_URL` |
+| `PROWLARR_API_KEY` | Prowlarr API key | Auto-configured |
+| `OPENSUBTITLES_API_KEY` | OpenSubtitles API key | Optional |
+| `OPENSUBTITLES_USERNAME` | OpenSubtitles username | Optional |
+| `OPENSUBTITLES_PASSWORD` | OpenSubtitles password | Optional |
+| `BETTER_AUTH_SECRET` | Auth secret (32+ characters) | Required |
+| `BETTER_AUTH_URL` | Base URL for authentication | `http://localhost:3300` |
+| `ENABLE_FILE_STORAGE` | Save files to disk | `true` |
+| `PORT` | Server port | `3300` |
+| `ORIGIN` | Public URL for CSRF protection | `http://localhost:3300` |
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Prowlarr connection problems">
+    **Issue**: Can't access Prowlarr API
+
+    **Solutions**:
+    - Check if containers are running: `docker ps`
+    - Verify Prowlarr API key in Plank settings page (`/settings`)
+    - Verify port 9696 isn't blocked by firewall (if running outside Docker network)
+    - Restart containers: `docker compose restart`
+  </Accordion>
+
+  <Accordion title="Cross-site POST form submissions are forbidden">
+    **Issue**: Error when submitting forms
+
+    **Solution**: Ensure the `ORIGIN` environment variable matches your browser URL exactly (e.g., `http://localhost:3300`, `http://192.168.1.2:3300`).
+  </Accordion>
+
+  <Accordion title="Container fails to start">
+    **Issue**: Docker container won't start
+
+    **Solutions**:
+    - Check environment variables in `.env` file
+    - Verify Docker is running: `docker version`
+    - Check for port conflicts (3300, 9696, 8191)
+    - Review container logs: `docker compose logs -f`
+    - Sometimes distro mirrors are out of sync - wait and try again
+  </Accordion>
+
+  <Accordion title="Permission errors">
+    **Issue**: File permission errors
+
+    **Solutions**:
+    - Check volume permissions for media directories
+    - Ensure proper PUID/PGID if using custom user IDs
+    - Verify the user running Docker has write access to `DATA_PATH`
+  </Accordion>
+
+  <Accordion title="Slow torrent downloads">
+    **Issue**: Downloads are slower than expected
+
+    **Solutions**:
+    - Use an ethernet connection instead of WiFi
+    - Configure port forwarding for port 6881 in your router
+    - Check if your VPN is throttling speeds or blocking torrent traffic
+    - Verify tracker health in Prowlarr
+  </Accordion>
+</AccordionGroup>
+
+## Security best practices
+
+<Warning>
+Always use a VPN when downloading torrents to protect your privacy and comply with your ISP's terms of service.
+</Warning>
+
+### Network security
+
+- Run Plank in Docker containers (already configured)
+- Use Tailscale for direct encrypted remote access
+- Keep your system and antivirus software updated
+- Consider network isolation if possible
+
+### File safety
+
+- Scan downloaded files with antivirus software before opening
+- Never run executable files (`.exe`, `.bat`, `.scr`) unless explicitly intended
+- Verify file sizes and types match expectations
+- Only download from indexers with good reputations
+
+### VPN recommendations
+
+- Use a reputable torrent-friendly VPN service
+- Ensure your VPN has a no-logs policy
+- Enable kill switch feature to prevent leaks on connection drops
+- Verify your VPN connection before starting downloads
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Configure indexers" icon="list" href="/configuration/torrent-indexers">
+    Set up torrent indexers in Prowlarr to enable content search
+  </Card>
+  <Card title="API reference" icon="code" href="/api-reference">
+    Learn about Plank's API endpoints and integration options
+  </Card>
+</Columns>

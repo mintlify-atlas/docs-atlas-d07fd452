@@ -1,0 +1,346 @@
+---
+title: Organizations & Profiles
+description: Multi-user profile system for isolated libraries
+icon: users
+---
+
+Plank uses an organization-based profile system powered by Better Auth, allowing you to create separate viewing profiles with isolated libraries.
+
+## What are Organizations?
+
+In Plank, "organizations" are essentially user profiles. Each organization has:
+
+- **Separate Media Library**: Completely isolated collection of movies and TV shows
+- **Independent Watch History**: Progress tracking per profile
+- **Custom Branding**: Profile name, logo, and color theme
+- **Member Management**: Invite other users to share the profile
+
+### Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Family Profiles" icon="home">
+    Create separate profiles for kids and adults with age-appropriate content libraries.
+  </Card>
+  
+  <Card title="Personal Collections" icon="user">
+    Maintain different libraries for different moods or genres (Movies, Anime, Documentaries, etc.).
+  </Card>
+  
+  <Card title="Shared Accounts" icon="user-group">
+    Share your Plank instance with roommates while keeping libraries separate.
+  </Card>
+  
+  <Card title="Testing/Demo" icon="flask">
+    Create disposable profiles for testing or demonstrating features.
+  </Card>
+</CardGroup>
+
+## Profile Selection
+
+When you log in to Plank, you're presented with a profile picker showing all available profiles.
+
+### Profile Picker UI
+
+The profile picker displays:
+- Grid of profile cards (2-5 columns depending on screen size)
+- Profile logo (or default avatar)
+- Profile name
+- Visual indicator for profiles you're a member of
+
+### Selecting a Profile
+
+Click any profile card to:
+1. Set it as your active organization
+2. Load that profile's library
+3. Navigate to the home screen
+
+Your active profile persists across sessions.
+
+### Access Control
+
+Profiles you're not a member of:
+- Show as grayed out
+- Display lock icon
+- Cannot be selected
+- Require an invitation from an admin
+
+## Creating Organizations
+
+Admins can create new profiles from the profile management page.
+
+### Create a Profile
+
+1. Navigate to **Profiles** page
+2. Click **Manage Profiles** (admins only)
+3. Click **Create New Profile**
+4. Enter profile details:
+   - Name (e.g., "Kids", "John's Movies", "Anime")
+   - Slug (URL-friendly identifier)
+   - Logo (optional, upload custom image)
+   - Color (theme color for the profile)
+5. Click **Create**
+
+The new profile is created with you as the first member.
+
+### Profile Settings
+
+#### Name
+Display name shown in profile picker and throughout the UI.
+
+#### Slug
+Unique URL identifier (e.g., "kids-profile"). Used in API endpoints and URLs.
+
+#### Logo
+Custom profile avatar:
+- Supports image upload
+- Displayed in profile picker
+- Shows on profile switcher
+- Defaults to generic avatar if not set
+
+#### Color
+Theme color for the profile:
+- Hex color code (e.g., #6366F1)
+- Used for branding elements
+- Default: #6366F1 (indigo)
+
+## Member Management
+
+Profiles support multiple members with different roles.
+
+### Inviting Members
+
+Admins can invite users to join a profile:
+
+1. Open profile management
+2. Select a profile
+3. Click **Invite Member**
+4. Enter user's email address
+5. Select role (member or admin)
+6. Click **Send Invitation**
+
+The user receives an email invitation with a link to accept.
+
+### Accepting Invitations
+
+Users invited to a profile:
+
+1. Receive email with invitation link
+2. Click link to view invitation details
+3. Click **Accept Invitation**
+4. Profile appears in profile picker
+5. Can now access that profile's library
+
+Invitations expire after a configurable period (default: 7 days).
+
+### Member Roles
+
+Profiles have two member roles:
+
+#### Member
+Standard user with permissions to:
+- View and play media in the library
+- Add new media
+- Delete media they added
+- Search and browse
+- Track watch progress
+
+#### Admin
+Full permissions including:
+- All member permissions
+- Invite new members
+- Remove members
+- Delete any media
+- Modify profile settings
+- Delete the profile
+
+### Removing Members
+
+Admins can remove members:
+
+1. Open profile management
+2. Select a profile
+3. View member list
+4. Click remove icon next to member
+5. Confirm removal
+
+Removed members:
+- Lose access to the profile immediately
+- Profile disappears from their profile picker
+- Cannot access that profile's library
+
+## How Organizations Work
+
+### Database Schema
+
+Organizations are implemented with these tables:
+
+#### organization
+Stores profile metadata:
+- id, name, slug
+- logo, color
+- timestamps
+
+#### member
+Links users to organizations:
+- userId, organizationId
+- role (member or admin)
+- join timestamp
+
+#### invitation
+Manages pending invitations:
+- email, organizationId
+- inviterId, role
+- status, expiresAt
+
+### Media Isolation
+
+Each media item belongs to an organization:
+
+```sql
+media.organizationId → organization.id
+```
+
+All queries are scoped to the active organization:
+- Library lists filter by organizationId
+- Search only queries active profile
+- Media creation includes organizationId
+- Unique constraint: (organizationId, infohash)
+
+This ensures complete isolation between profiles.
+
+### Session Management
+
+Your session tracks the active organization:
+
+```sql
+session.activeOrganizationId → organization.id
+```
+
+When you select a profile:
+1. Session updated with new activeOrganizationId
+2. All subsequent requests use that organizationId
+3. Library and API calls automatically scoped
+
+## Profile Switching
+
+You can switch between profiles at any time:
+
+1. Navigate to **Profiles** page
+2. Select a different profile
+3. Library refreshes with that profile's content
+
+Profile switching:
+- Clears React Query cache
+- Loads new profile's library
+- Updates session
+- Preserves watch progress per profile
+
+## Admin vs Non-Admin Users
+
+### Admin Users
+
+Users with `role='admin'` (in user table):
+- Can create new profiles
+- See "Manage Profiles" button
+- Can invite members to any profile
+- Full system access
+
+### Non-Admin Users
+
+Regular users:
+- Can only access profiles they're invited to
+- Cannot create new profiles
+- Cannot see profiles they're not members of
+- See "Waiting for Access" if they have no profiles
+
+### First-Time Setup
+
+If a non-admin user logs in with no profiles:
+- Shows "Waiting for Access" screen
+- Cannot access the app
+- Must wait for admin invitation
+
+Admins should create at least one profile for new users.
+
+## Advanced: Better Auth Integration
+
+Plank uses Better Auth's organization plugin for profile management.
+
+### Better Auth Features Used
+
+- **createOrganization**: API to create new profiles
+- **setActive**: Set active organization for session
+- **member table**: Links users to organizations
+- **invitation table**: Manages invitations
+
+### Organization Metadata
+
+The `metadata` field (JSON) can store:
+- Custom profile settings
+- UI preferences
+- Feature flags
+- (Currently unused, reserved for future features)
+
+### Security
+
+Better Auth ensures:
+- Row-level security via organizationId scoping
+- Session-based authorization
+- Invitation token security
+- Role-based permissions
+
+## Best Practices
+
+### Organizing Profiles
+
+- **Don't over-create**: Too many profiles becomes hard to manage
+- **Clear naming**: Use descriptive names ("Kids", not "Profile 1")
+- **Consistent branding**: Choose distinct logos/colors
+- **Purpose-driven**: Create profiles for specific use cases
+
+### Invitation Management
+
+- **Pre-create profiles**: Create profiles before inviting users
+- **Set roles carefully**: Grant admin sparingly
+- **Monitor invitations**: Check for expired invitations
+- **Revoke when needed**: Remove members who shouldn't have access
+
+### Library Organization
+
+- **Content segregation**: Use profiles to separate types of content
+- **Age-appropriate**: Keep kids' content in separate profile
+- **Language/region**: Separate profiles for different language content
+
+## Troubleshooting
+
+### Can't See Any Profiles
+
+**Non-admin user with no invitations**:
+- Contact admin to send invitation
+- Check email for invitation links
+- Verify email address matches account
+
+### Can't Create Profiles
+
+**User is not admin**:
+- Only users with `role='admin'` can create profiles
+- Contact system admin for permission
+
+### Profile Not Updating
+
+**Stale cache**:
+- Refresh the page
+- Switch profiles and switch back
+- Clear browser cache
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Media Library" icon="library" href="/features/media-library">
+    Learn how to build your library within a profile
+  </Card>
+  
+  <Card title="Search & Browse" icon="search" href="/features/search-browse">
+    Discover content to add to your profile
+  </Card>
+</CardGroup>

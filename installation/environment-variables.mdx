@@ -1,0 +1,623 @@
+---
+title: 'Environment Variables'
+description: 'Complete reference for configuring Plank with environment variables'
+icon: 'gear'
+---
+
+Plank uses environment variables for all configuration. These are typically defined in a `.env` file in the project root.
+
+## Quick Reference
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DATABASE_URL` | ✓ | `./plank.db` | Path to SQLite database file |
+| `DATA_PATH` | ✓ | `./data` | Directory for downloaded files |
+| `TMDB_API_KEY` | ✓ | - | TMDB API key for movie/TV metadata |
+| `PROWLARR_URL` | - | `http://localhost:9696` | Prowlarr API base URL |
+| `PUBLIC_PROWLARR_URL` | - | `${PROWLARR_URL}` | Public-facing Prowlarr URL |
+| `PROWLARR_API_KEY` | - | - | Prowlarr API key (auto-configured in Docker) |
+| `PROWLARR_CONFIG_PATH` | - | - | Path to Prowlarr config.xml (Docker only) |
+| `FLARESOLVERR_URL` | - | - | FlareSolverr URL for captcha solving |
+| `OPENSUBTITLES_API_KEY` | - | - | OpenSubtitles API key |
+| `OPENSUBTITLES_USERNAME` | - | - | OpenSubtitles account username |
+| `OPENSUBTITLES_PASSWORD` | - | - | OpenSubtitles account password |
+| `BETTER_AUTH_SECRET` | ✓ | - | Secret key for authentication (32+ chars) |
+| `BETTER_AUTH_URL` | ✓ | `http://localhost:3300` | Base URL for authentication callbacks |
+| `ENABLE_FILE_STORAGE` | - | `true` | Save downloaded files to disk |
+| `PORT` | - | `3300` | Server port number |
+| `HOST` | - | `0.0.0.0` | Server host binding (Docker: `0.0.0.0`) |
+| `ORIGIN` | Docker | `http://localhost:3300` | Public URL for CSRF protection |
+| `TZ` | - | `America/New_York` | Timezone (Prowlarr/FlareSolverr) |
+| `MEDIA_PATH` | - | `./media` | Host path for media library (Docker) |
+
+## Database Configuration
+
+### DATABASE_URL
+
+<ParamField path="DATABASE_URL" type="string" required>
+  Path to the SQLite database file. Can be relative or absolute.
+</ParamField>
+
+**Examples:**
+```bash
+# Relative path (default)
+DATABASE_URL=./plank.db
+
+# Absolute path
+DATABASE_URL=/var/lib/plank/plank.db
+
+# Docker (inside container)
+DATABASE_URL=/app/db/plank.db
+```
+
+<Note>
+  The database file will be created automatically on first run. Ensure the directory is writable.
+</Note>
+
+### DATA_PATH
+
+<ParamField path="DATA_PATH" type="string" required>
+  Directory where torrent files are downloaded and stored.
+</ParamField>
+
+**Examples:**
+```bash
+# Relative path (default)
+DATA_PATH=./data
+
+# Absolute path
+DATA_PATH=/mnt/storage/plank
+
+# Docker (inside container)
+DATA_PATH=/app/data
+```
+
+<Warning>
+  Ensure sufficient disk space. A single 4K movie can be 40GB+.
+</Warning>
+
+## Metadata & Search
+
+### TMDB_API_KEY
+
+<ParamField path="TMDB_API_KEY" type="string" required>
+  API key from The Movie Database for fetching movie/TV show metadata, posters, and descriptions.
+</ParamField>
+
+**Get your API key:**
+1. Create an account at [themoviedb.org](https://www.themoviedb.org)
+2. Go to [Settings → API](https://www.themoviedb.org/settings/api)
+3. Request an API key (choose "Developer" option)
+4. Copy the **API Key (v3 auth)**
+
+```bash
+TMDB_API_KEY=your_api_key_here_32_characters_long
+```
+
+<Note>
+  Search functionality requires a valid TMDB API key. Without it, you can only add content via magnet links.
+</Note>
+
+## Prowlarr Configuration
+
+Prowlarr provides torrent search functionality by aggregating multiple indexers.
+
+### PROWLARR_URL
+
+<ParamField path="PROWLARR_URL" type="string" default="http://localhost:9696">
+  Internal URL for Plank to communicate with Prowlarr.
+</ParamField>
+
+**Examples:**
+```bash
+# Bare metal (localhost)
+PROWLARR_URL=http://localhost:9696
+
+# Docker (service name)
+PROWLARR_URL=http://prowlarr:9696
+
+# Remote Prowlarr instance
+PROWLARR_URL=http://192.168.1.100:9696
+```
+
+<Note>
+  In Docker, always use the service name (`prowlarr`) instead of `localhost`.
+</Note>
+
+### PUBLIC_PROWLARR_URL
+
+<ParamField path="PUBLIC_PROWLARR_URL" type="string">
+  Public-facing URL for accessing Prowlarr. Defaults to `PROWLARR_URL`.
+</ParamField>
+
+Useful when Plank and Prowlarr are accessed via different URLs:
+
+```bash
+PROWLARR_URL=http://prowlarr:9696
+PUBLIC_PROWLARR_URL=http://192.168.1.100:9696
+```
+
+### PROWLARR_API_KEY
+
+<ParamField path="PROWLARR_API_KEY" type="string">
+  API key for authenticating with Prowlarr. Auto-configured in Docker deployments.
+</ParamField>
+
+**Docker:** Leave blank - automatically extracted from Prowlarr's config.
+
+**Bare Metal:** Get from Prowlarr:
+1. Access Prowlarr at `http://localhost:9696`
+2. Go to **Settings** → **General**
+3. Copy the **API Key**
+
+```bash
+# Docker (auto-configured)
+PROWLARR_API_KEY=
+
+# Bare metal (manual)
+PROWLARR_API_KEY=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
+```
+
+### PROWLARR_CONFIG_PATH
+
+<ParamField path="PROWLARR_CONFIG_PATH" type="string">
+  Path to Prowlarr's `config.xml` file (Docker only). Used to auto-extract the API key.
+</ParamField>
+
+```bash
+# Docker (automatic)
+PROWLARR_CONFIG_PATH=/prowlarr-config/config.xml
+```
+
+<Note>
+  This is only used in Docker deployments where Prowlarr's config volume is mounted into the Plank container.
+</Note>
+
+## FlareSolverr Configuration
+
+### FLARESOLVERR_URL
+
+<ParamField path="FLARESOLVERR_URL" type="string">
+  URL to FlareSolverr service for solving captchas on torrent sites.
+</ParamField>
+
+**Examples:**
+```bash
+# Docker (service name)
+FLARESOLVERR_URL=http://flaresolverr:8191
+
+# Bare metal (localhost)
+FLARESOLVERR_URL=http://localhost:8191
+
+# Remote instance
+FLARESOLVERR_URL=http://192.168.1.100:8191
+```
+
+<Note>
+  FlareSolverr is configured in Prowlarr, not directly in Plank. This variable is for Prowlarr to use.
+</Note>
+
+## Subtitle Configuration
+
+OpenSubtitles provides subtitle downloads in multiple languages.
+
+### OPENSUBTITLES_API_KEY
+
+<ParamField path="OPENSUBTITLES_API_KEY" type="string">
+  API key from OpenSubtitles.com for downloading subtitles.
+</ParamField>
+
+**Get your API key:**
+1. Create an account at [opensubtitles.com](https://www.opensubtitles.com)
+2. Go to [Consumers](https://www.opensubtitles.com/consumers)
+3. Create a new application
+4. Copy the API key
+
+```bash
+OPENSUBTITLES_API_KEY=your_api_key_here
+```
+
+### OPENSUBTITLES_USERNAME
+
+<ParamField path="OPENSUBTITLES_USERNAME" type="string">
+  Your OpenSubtitles account username.
+</ParamField>
+
+```bash
+OPENSUBTITLES_USERNAME=your_username
+```
+
+### OPENSUBTITLES_PASSWORD
+
+<ParamField path="OPENSUBTITLES_PASSWORD" type="string">
+  Your OpenSubtitles account password.
+</ParamField>
+
+```bash
+OPENSUBTITLES_PASSWORD=your_password
+```
+
+<Warning>
+  Without OpenSubtitles configuration, subtitle functionality will be disabled.
+</Warning>
+
+## Authentication
+
+### BETTER_AUTH_SECRET
+
+<ParamField path="BETTER_AUTH_SECRET" type="string" required>
+  Secret key for encrypting session tokens and cookies. Must be at least 32 characters.
+</ParamField>
+
+**Generate a secure secret:**
+```bash
+# Using OpenSSL
+openssl rand -hex 32
+
+# Using Node.js
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+```bash
+BETTER_AUTH_SECRET=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6
+```
+
+<Warning>
+  **Never share this secret publicly.** Changing it will invalidate all existing user sessions.
+</Warning>
+
+### BETTER_AUTH_URL
+
+<ParamField path="BETTER_AUTH_URL" type="string" required default="http://localhost:3300">
+  Base URL for authentication callbacks and redirects. Must match the URL users access Plank from.
+</ParamField>
+
+**Examples:**
+```bash
+# Local development
+BETTER_AUTH_URL=http://localhost:3300
+
+# Local network
+BETTER_AUTH_URL=http://192.168.1.100:3300
+
+# Production with domain
+BETTER_AUTH_URL=https://plank.yourdomain.com
+```
+
+<Note>
+  Include the protocol (`http://` or `https://`) and port if non-standard.
+</Note>
+
+## Server Configuration
+
+### PORT
+
+<ParamField path="PORT" type="number" default="3300">
+  Port number the server listens on.
+</ParamField>
+
+```bash
+# Default
+PORT=3300
+
+# Custom port
+PORT=8080
+```
+
+<Note>
+  In Docker, this is the **internal** container port (usually `3000`). The host port is configured in `docker-compose.yml`.
+</Note>
+
+### HOST
+
+<ParamField path="HOST" type="string" default="0.0.0.0">
+  Network interface to bind to.
+</ParamField>
+
+```bash
+# Listen on all interfaces (Docker, production)
+HOST=0.0.0.0
+
+# Listen on localhost only (development)
+HOST=127.0.0.1
+```
+
+### ORIGIN
+
+<ParamField path="ORIGIN" type="string" required="Docker only">
+  Public URL users access Plank from. Required for Docker to prevent CSRF errors.
+</ParamField>
+
+**Examples:**
+```bash
+# Local access
+ORIGIN=http://localhost:3300
+
+# Network access
+ORIGIN=http://192.168.1.100:3300
+
+# Domain with HTTPS
+ORIGIN=https://plank.yourdomain.com
+```
+
+<Warning>
+  **Docker users:** If you get "Cross-site POST form submissions are forbidden", ensure `ORIGIN` matches your browser URL exactly.
+</Warning>
+
+## Storage Configuration
+
+### ENABLE_FILE_STORAGE
+
+<ParamField path="ENABLE_FILE_STORAGE" type="boolean" default="true">
+  Whether to save downloaded files to disk. Reserved for future functionality.
+</ParamField>
+
+```bash
+ENABLE_FILE_STORAGE=true
+```
+
+<Note>
+  Keep this as `true`. Setting to `false` may cause issues in the current version.
+</Note>
+
+### MEDIA_PATH
+
+<ParamField path="MEDIA_PATH" type="string" default="./media">
+  Host directory for media library (Docker only). Mounted at `/app/data/library` inside the container.
+</ParamField>
+
+```bash
+# Default (relative to docker-compose.yml)
+MEDIA_PATH=./media
+
+# Absolute path
+MEDIA_PATH=/mnt/storage/media
+
+# Network share
+MEDIA_PATH=/mnt/nas/media
+```
+
+## Timezone
+
+### TZ
+
+<ParamField path="TZ" type="string" default="America/New_York">
+  Timezone for Prowlarr and FlareSolverr containers.
+</ParamField>
+
+**Examples:**
+```bash
+TZ=America/New_York
+TZ=Europe/London
+TZ=Asia/Tokyo
+TZ=UTC
+```
+
+See [list of tz database time zones](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
+
+## Example Configurations
+
+### Minimal Docker Configuration
+
+```bash .env
+# Required
+TMDB_API_KEY=your_tmdb_api_key
+BETTER_AUTH_SECRET=your-random-32-char-secret
+BETTER_AUTH_URL=http://localhost:3300
+ORIGIN=http://localhost:3300
+
+# Optional (Prowlarr auto-configured)
+PROWLARR_API_KEY=
+```
+
+### Full Docker Configuration
+
+```bash .env
+# Database
+DATABASE_URL=/app/db/plank.db
+DATA_PATH=/app/data
+
+# Metadata
+TMDB_API_KEY=your_tmdb_api_key
+
+# Prowlarr (auto-configured)
+PROWLARR_URL=http://prowlarr:9696
+PUBLIC_PROWLARR_URL=http://192.168.1.100:9696
+PROWLARR_API_KEY=
+FLARESOLVERR_URL=http://flaresolverr:8191
+
+# Subtitles
+OPENSUBTITLES_API_KEY=your_opensubtitles_api_key
+OPENSUBTITLES_USERNAME=your_username
+OPENSUBTITLES_PASSWORD=your_password
+
+# Authentication
+BETTER_AUTH_SECRET=your-random-32-char-secret
+BETTER_AUTH_URL=http://192.168.1.100:3300
+
+# Server
+PORT=3000
+HOST=0.0.0.0
+ORIGIN=http://192.168.1.100:3300
+ENABLE_FILE_STORAGE=true
+
+# Docker specific
+TZ=America/New_York
+MEDIA_PATH=/mnt/storage/media
+```
+
+### Bare Metal Configuration
+
+```bash .env
+# Database
+DATABASE_URL=./plank.db
+DATA_PATH=./data
+
+# Metadata
+TMDB_API_KEY=your_tmdb_api_key
+
+# Prowlarr (manual configuration)
+PROWLARR_URL=http://localhost:9696
+PUBLIC_PROWLARR_URL=http://localhost:9696
+PROWLARR_API_KEY=your_prowlarr_api_key_from_settings
+
+# Subtitles
+OPENSUBTITLES_API_KEY=your_opensubtitles_api_key
+OPENSUBTITLES_USERNAME=your_username
+OPENSUBTITLES_PASSWORD=your_password
+
+# Authentication
+BETTER_AUTH_SECRET=your-random-32-char-secret
+BETTER_AUTH_URL=http://localhost:3300
+
+# Server
+PORT=3300
+ENABLE_FILE_STORAGE=true
+```
+
+### Production with HTTPS
+
+```bash .env
+# Production settings
+NODE_ENV=production
+
+# Database
+DATABASE_URL=/var/lib/plank/plank.db
+DATA_PATH=/var/lib/plank/data
+
+# Metadata
+TMDB_API_KEY=your_tmdb_api_key
+
+# Prowlarr
+PROWLARR_URL=http://prowlarr:9696
+PUBLIC_PROWLARR_URL=https://prowlarr.yourdomain.com
+PROWLARR_API_KEY=your_prowlarr_api_key
+
+# Subtitles
+OPENSUBTITLES_API_KEY=your_opensubtitles_api_key
+OPENSUBTITLES_USERNAME=your_username
+OPENSUBTITLES_PASSWORD=your_password
+
+# Authentication
+BETTER_AUTH_SECRET=very-long-random-production-secret-string
+BETTER_AUTH_URL=https://plank.yourdomain.com
+
+# Server (behind reverse proxy)
+PORT=3000
+HOST=127.0.0.1
+ORIGIN=https://plank.yourdomain.com
+ENABLE_FILE_STORAGE=true
+```
+
+## Security Best Practices
+
+1. **Never commit `.env` files** to version control
+   ```bash
+   # Add to .gitignore
+   echo ".env" >> .gitignore
+   ```
+
+2. **Use strong secrets** (32+ characters, random)
+   ```bash
+   BETTER_AUTH_SECRET=$(openssl rand -hex 32)
+   ```
+
+3. **Restrict file permissions**
+   ```bash
+   chmod 600 .env
+   ```
+
+4. **Use environment-specific values**
+   - Development: `http://localhost:3300`
+   - Production: `https://plank.yourdomain.com`
+
+5. **Rotate secrets periodically** (invalidates existing sessions)
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Variables not loading">
+    Ensure `.env` is in the project root and properly formatted:
+    
+    ```bash
+    # Correct
+    TMDB_API_KEY=abc123
+    
+    # Incorrect (spaces around =)
+    TMDB_API_KEY = abc123
+    
+    # Incorrect (quotes not needed)
+    TMDB_API_KEY="abc123"
+    ```
+    
+    Test loading:
+    ```bash
+    # Source the file
+    set -a; source .env; set +a
+    echo $TMDB_API_KEY
+    ```
+  </Accordion>
+
+  <Accordion title='"CSRF forbidden" error in Docker'>
+    Ensure `ORIGIN` matches your browser URL exactly:
+    
+    ```bash
+    # Browser URL: http://192.168.1.100:3300
+    ORIGIN=http://192.168.1.100:3300
+    
+    # Not: http://localhost:3300
+    ```
+    
+    Restart after changing:
+    ```bash
+    docker compose -f docker/docker-compose.yml restart plank
+    ```
+  </Accordion>
+
+  <Accordion title="Prowlarr connection fails">
+    **Docker:** Verify service name (not `localhost`):
+    ```bash
+    PROWLARR_URL=http://prowlarr:9696
+    ```
+    
+    **Bare Metal:** Verify Prowlarr is running:
+    ```bash
+    curl http://localhost:9696
+    ```
+    
+    Check API key matches Prowlarr settings:
+    - Prowlarr → Settings → General → API Key
+  </Accordion>
+
+  <Accordion title="Authentication errors">
+    Verify `BETTER_AUTH_SECRET` is set and at least 32 characters:
+    
+    ```bash
+    # Generate new secret
+    openssl rand -hex 32
+    ```
+    
+    Ensure `BETTER_AUTH_URL` matches your access URL:
+    ```bash
+    # If accessing via http://192.168.1.100:3300
+    BETTER_AUTH_URL=http://192.168.1.100:3300
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Setup" icon="docker" href="/installation/docker">
+    Configure Docker deployment
+  </Card>
+  <Card title="Bare Metal Setup" icon="server" href="/installation/bare-metal">
+    Install on your system
+  </Card>
+  <Card title="Prowlarr Configuration" icon="magnifying-glass" href="/configuration/indexers">
+    Set up torrent indexers
+  </Card>
+  <Card title="Security Guide" icon="shield" href="/configuration/security">
+    VPN setup and best practices
+  </Card>
+</CardGroup>

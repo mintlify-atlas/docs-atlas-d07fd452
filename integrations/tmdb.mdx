@@ -1,0 +1,160 @@
+---
+title: TMDB Integration
+description: Connect Plank to The Movie Database for rich metadata and artwork
+---
+
+The Movie Database (TMDB) provides comprehensive metadata for movies and TV shows, including titles, descriptions, posters, backdrops, genres, ratings, and more.
+
+## Overview
+
+Plank uses TMDB to:
+
+- Fetch movie and TV show metadata when adding content to your library
+- Display posters, backdrops, and artwork throughout the interface
+- Search for content when browsing for torrents
+- Retrieve episode information for TV shows
+- Get content ratings and certifications (PG, R, etc.)
+
+TMDB is **required** for Plank's search and browse features to work properly.
+
+## Getting Your API Key
+
+<Steps>
+  <Step title="Create a TMDB account">
+    Visit [themoviedb.org](https://www.themoviedb.org) and create a free account if you don't have one.
+  </Step>
+
+  <Step title="Apply for API access">
+    Navigate to your account settings and go to the [API section](https://www.themoviedb.org/settings/api).
+    
+    Click "Request an API Key" and select the type of use (typically "Developer" for personal use).
+  </Step>
+
+  <Step title="Fill out the application">
+    Provide the requested information:
+    - Application name: `Plank Media Server` (or your preferred name)
+    - Application URL: Your Plank instance URL or `http://localhost:3300`
+    - Application summary: Brief description of personal media streaming use
+    
+    Accept the terms and submit your application.
+  </Step>
+
+  <Step title="Copy your API key">
+    Once approved (usually instant for personal use), you'll receive an **API Key (v3 auth)**.
+    
+    Copy the key - you'll need it for configuration.
+  </Step>
+</Steps>
+
+## Configuration
+
+### Environment Variable
+
+Add your TMDB API key to your `.env` file:
+
+```bash
+TMDB_API_KEY=your_api_key_here
+```
+
+### Settings UI
+
+Alternatively, configure TMDB through the Plank settings interface:
+
+1. Navigate to **Settings** in Plank
+2. Locate the **TMDB API Key** field
+3. Paste your API key
+4. Click **Save**
+
+## How It Works
+
+When you search for or add media to Plank, the application:
+
+1. **Searches TMDB** using the title and optional year
+2. **Retrieves metadata** including:
+   - Title, release date, and overview
+   - Poster images (342px width) and backdrop images (780px width)
+   - Genres, runtime, and original language
+   - Content ratings (US certifications)
+   - Season and episode details for TV shows
+3. **Caches images locally** to reduce repeated API calls
+4. **Stores metadata** in the Plank database for fast access
+
+### Supported Features
+
+**Movies (`tmdb.ts:353-449`)**
+- Search by title and year
+- Fetch full movie details with genres and runtime
+- Retrieve US theatrical ratings (G, PG, PG-13, R, etc.)
+
+**TV Shows (`tmdb.ts:456-610`)**
+- Search by title and first air date year
+- Fetch show details with season information
+- Retrieve US TV content ratings (TV-Y, TV-PG, TV-14, TV-MA, etc.)
+- Get detailed season and episode metadata
+- Support for specials (Season 0) when explicitly requested
+
+**Browse & Discover (`tmdb.ts:226-276`)**
+- Trending movies and TV shows (daily or weekly)
+- Popular movies and TV shows
+- Genre-based filtering
+- Paginated results for infinite scroll
+
+## API Rate Limits
+
+TMDB has generous rate limits for API usage:
+
+- **40 requests per 10 seconds** per IP address
+- No daily request limit for free API keys
+
+Plank implements caching to minimize API calls:
+
+- **Browse item details** are cached for 3 hours (500 items max)
+- **Images** are downloaded and stored locally after first fetch
+- **Metadata** is stored in the database and only refreshed when needed
+
+## Troubleshooting
+
+### Search returns no results
+
+**Problem**: Searches don't return any movies or TV shows.
+
+**Solutions**:
+- Verify your API key is correctly configured in `.env` or settings
+- Check that the TMDB API is accessible from your network
+- Ensure there are no typos in the search query
+- Try searching with the release year for more specific results
+
+### Images not loading
+
+**Problem**: Posters and backdrops don't display.
+
+**Solutions**:
+- Check that `DATA_PATH` environment variable is set correctly
+- Ensure the Plank process has write permissions to the data directory
+- Verify network connectivity to TMDB's image CDN (`image.tmdb.org`)
+- Check browser console for CORS or network errors
+
+### API key invalid
+
+**Problem**: Error messages about invalid or missing API key.
+
+**Solutions**:
+- Confirm you're using the **API Key (v3 auth)**, not the v4 access token
+- Check for extra spaces or newlines when pasting the key
+- Ensure the key hasn't been revoked in your TMDB account settings
+- Restart Plank after updating the `.env` file
+
+## Data Privacy
+
+Plank's TMDB integration:
+
+- Only sends search queries and TMDB/IMDB IDs to TMDB's servers
+- Does not transmit information about your library contents
+- Stores metadata and images locally for privacy
+- Uses TMDB's API following their [terms of service](https://www.themoviedb.org/terms-of-use)
+
+## Learn More
+
+- [TMDB API Documentation](https://developers.themoviedb.org/3)
+- [TMDB API Status](https://status.themoviedb.org/)
+- [Request an API Key](https://www.themoviedb.org/settings/api)

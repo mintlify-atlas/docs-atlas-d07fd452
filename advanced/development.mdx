@@ -1,0 +1,374 @@
+---
+title: Development Guide
+description: Contributing to Plank and setting up a development environment
+---
+
+<Warning>
+  This repo is under heavy development and there isn't a consistent way to migrate your media data in the local database or file system when breaking changes are made. Use this project at your own risk.
+</Warning>
+
+## Development Philosophy
+
+Plank uses Docker containers for development with live reloads. This approach keeps the development environment and production closely aligned, making it easier to write code that runs everywhere.
+
+## Prerequisites
+
+Before starting development, ensure you have:
+
+- **Docker** and **Docker Compose** installed
+- **Git** for version control
+- A text editor or IDE (VS Code recommended)
+- Basic knowledge of:
+  - TypeScript
+  - Svelte/SvelteKit
+  - Docker
+
+## Getting Started
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/logscore/plank.git
+cd plank
+```
+
+### 2. Set Up Environment Variables
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your configuration:
+
+```bash
+# Database
+DATABASE_URL=./plank.db
+
+# Where the files are saved when downloaded
+DATA_PATH=./data
+
+# Get yours here https://www.themoviedb.org/settings/api
+TMDB_API_KEY=your_tmdb_api_key_here
+
+# Prowlarr (Torrent Search)
+PROWLARR_URL=http://prowlarr:9696
+PUBLIC_PROWLARR_URL=${PROWLARR_URL}
+PROWLARR_API_KEY=  # Leave blank when self-hosted
+
+# OpenSubtitles (Subtitle Downloads)
+# Create account at https://www.opensubtitles.com/consumers
+OPENSUBTITLES_API_KEY=
+OPENSUBTITLES_USERNAME=
+OPENSUBTITLES_PASSWORD=
+
+# Authentication
+BETTER_AUTH_SECRET=super-secret-32-char-string
+BETTER_AUTH_URL=http://localhost:3300
+
+# Reserved for future functionality
+ENABLE_FILE_STORAGE=true
+
+PORT=3300
+ORIGIN=http://localhost:3300
+```
+
+### 3. Start Development Environment
+
+Use the development script to start all services with hot reload:
+
+```bash
+./scripts/dev.sh
+```
+
+This script:
+- Loads environment variables from `.env`
+- Starts Docker Compose with the development configuration
+- Enables hot module replacement for instant code updates
+- Starts Prowlarr and FlareSolverr services
+
+Alternatively, run Docker Compose directly:
+
+```bash
+docker compose -f docker/docker-compose.dev.yml up --build
+```
+
+### 4. Access the Application
+
+Once running, access:
+- **Plank:** http://localhost:3300
+- **Prowlarr:** http://localhost:9696
+- **FlareSolverr:** http://localhost:8191
+
+## Project Structure
+
+```
+plank/
+├── src/                    # Application source code
+│   ├── lib/               # Shared libraries and components
+│   ├── routes/            # SvelteKit routes
+│   └── app.html           # HTML template
+├── static/                # Static assets
+├── docker/                # Docker configuration
+│   ├── docker-compose.yml     # Production compose
+│   └── docker-compose.dev.yml # Development compose
+├── scripts/               # Utility scripts
+│   ├── dev.sh            # Development starter
+│   └── deploy.sh         # Deployment script
+├── .env.example           # Environment template
+├── package.json           # Dependencies and scripts
+├── svelte.config.js       # SvelteKit configuration
+├── vite.config.js         # Vite configuration
+└── tsconfig.json          # TypeScript configuration
+```
+
+## Available Scripts
+
+Plank uses npm scripts for common development tasks:
+
+### Development
+
+```bash
+# Start development server (without Docker)
+npm run dev
+
+# Start development server with Docker (recommended)
+./scripts/dev.sh
+```
+
+### Building
+
+```bash
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+### Code Quality
+
+```bash
+# Run all checks (Svelte + TypeScript + linting + unused code detection)
+npm run check
+
+# Run checks in watch mode
+npm run check:watch
+
+# Format and lint code with Biome
+npm run lint
+
+# Format code only
+npm run format
+
+# Detect unused dependencies and exports
+npm run knip
+```
+
+### Testing
+
+```bash
+# Run tests once
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+```
+
+### Database
+
+```bash
+# Generate database migrations
+npm run db:generate
+
+# Run migrations
+npm run db:migrate
+
+# Push schema changes directly (development only)
+npm run db:push
+```
+
+### Optimization
+
+```bash
+# Optimize media library
+npm run library:optimize
+```
+
+## Code Standards
+
+Plank uses **Ultracite**, a zero-config preset that enforces strict code quality through Biome.
+
+### Quick Reference
+
+```bash
+# Auto-fix issues
+npm exec -- ultracite fix
+
+# Check for issues without fixing
+npm exec -- ultracite check
+
+# Diagnose setup issues
+npm exec -- ultracite doctor
+```
+
+### Key Principles
+
+1. **Type Safety**
+   - Use explicit types for function parameters and return values
+   - Prefer `unknown` over `any`
+   - Use const assertions for immutable values
+
+2. **Modern JavaScript/TypeScript**
+   - Use arrow functions for callbacks
+   - Prefer `for...of` over `.forEach()`
+   - Use optional chaining (`?.`) and nullish coalescing (`??`)
+   - Use `const` by default, `let` only when needed, never `var`
+
+3. **React/Svelte Best Practices**
+   - Use function components
+   - Call hooks at top level only
+   - Specify all dependencies correctly
+   - Use semantic HTML for accessibility
+
+4. **Clean Code**
+   - Remove `console.log` and `debugger` statements
+   - Use early returns to reduce nesting
+   - Extract complex conditions into named variables
+   - Keep functions focused and small
+
+### Before Committing
+
+```bash
+# Run all checks and auto-fix issues
+npm exec -- ultracite fix
+```
+
+Biome will automatically catch most formatting and common issues.
+
+## Database Development
+
+Plank uses Drizzle ORM with SQLite.
+
+### Making Schema Changes
+
+1. **Edit the schema** in your Drizzle schema files
+
+2. **Generate migration:**
+   ```bash
+   npm run db:generate
+   ```
+
+3. **Apply migration:**
+   ```bash
+   npm run db:migrate
+   ```
+
+4. **For development only,** you can push changes directly:
+   ```bash
+   npm run db:push
+   ```
+
+<Warning>
+  There is currently no consistent migration strategy for breaking changes. User data may be lost during updates.
+</Warning>
+
+## Docker Development
+
+### Development Compose File
+
+The `docker-compose.dev.yml` file includes:
+- Volume mounts for live code reloading
+- Development-optimized build settings
+- Service dependencies (Prowlarr, FlareSolverr)
+
+### Rebuilding Containers
+
+After changing dependencies or Dockerfile:
+
+```bash
+docker compose -f docker/docker-compose.dev.yml up --build
+```
+
+### Viewing Logs
+
+```bash
+# All services
+docker compose -f docker/docker-compose.dev.yml logs -f
+
+# Specific service
+docker compose -f docker/docker-compose.dev.yml logs -f plank
+```
+
+### Stopping Services
+
+```bash
+docker compose -f docker/docker-compose.dev.yml down
+```
+
+## Contributing
+
+### Workflow
+
+1. **Fork the repository** on GitHub
+
+2. **Create a feature branch:**
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+3. **Make your changes** following the code standards
+
+4. **Run checks:**
+   ```bash
+   npm run check
+   npm test
+   ```
+
+5. **Commit your changes:**
+   ```bash
+   git commit -m "Add feature: description"
+   ```
+
+6. **Push to your fork:**
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+7. **Create a Pull Request** on GitHub
+
+### Commit Message Guidelines
+
+- Use clear, descriptive messages
+- Start with a verb (Add, Fix, Update, Remove, etc.)
+- Keep the first line under 72 characters
+- Reference issues when applicable
+
+Examples:
+```
+Add subtitle language selection
+Fix torrent download progress tracking
+Update Prowlarr API integration
+Remove deprecated authentication method
+```
+
+## Getting Help
+
+If you're stuck:
+
+1. Check the [GitHub Issues](https://github.com/logscore/plank/issues) for similar problems
+2. Review the main [README](https://github.com/logscore/plank/blob/master/README.md)
+3. Check the troubleshooting guide
+4. Email the developer at [lsreedercontact@gmail.com](mailto:lsreedercontact@gmail.com)
+   - **No AI-generated questions** - these will be ignored
+
+## Resources
+
+- [SvelteKit Documentation](https://kit.svelte.dev/docs)
+- [Drizzle ORM Documentation](https://orm.drizzle.team/docs/overview)
+- [Prowlarr API Documentation](https://wiki.servarr.com/prowlarr/api)
+- [Docker Documentation](https://docs.docker.com/)

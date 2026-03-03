@@ -1,0 +1,336 @@
+---
+title: FlareSolverr Integration
+description: Bypass Cloudflare protection on torrent indexers with FlareSolverr
+---
+
+FlareSolverr is a proxy server that solves Cloudflare challenges, allowing Prowlarr to access indexers that would otherwise block automated requests. This enables reliable torrent searching across sites with anti-bot protection.
+
+## Overview
+
+Many torrent indexers use Cloudflare to prevent scraping and automated access. FlareSolverr acts as a middleware proxy that:
+
+- **Solves JavaScript challenges** that verify browser authenticity
+- **Handles CAPTCHA challenges** (when solvable programmatically)
+- **Manages cookies** to maintain authenticated sessions
+- **Proxies requests** through a headless browser
+
+FlareSolverr is **required** for accessing Cloudflare-protected indexers like 1337x, The Pirate Bay, and others.
+
+## Installation
+
+### Docker (Recommended)
+
+FlareSolverr is automatically included in Plank's Docker Compose setup:
+
+```bash
+docker compose -f docker/docker-compose.yml --env-file .env up -d
+```
+
+This starts FlareSolverr on port **8191** alongside Plank and Prowlarr.
+
+### Bare Metal
+
+For manual installation:
+
+<Steps>
+  <Step title="Install dependencies">
+    FlareSolverr requires:
+    - Python 3.8+
+    - Chromium or Chrome browser
+    - Selenium WebDriver
+  </Step>
+
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/FlareSolverr/FlareSolverr.git
+    cd FlareSolverr
+    ```
+  </Step>
+
+  <Step title="Install Python packages">
+    ```bash
+    pip install -r requirements.txt
+    ```
+  </Step>
+
+  <Step title="Run FlareSolverr">
+    ```bash
+    python src/flaresolverr.py
+    ```
+    
+    FlareSolverr will start on `http://localhost:8191` by default.
+  </Step>
+</Steps>
+
+See the [official installation guide](https://github.com/FlareSolverr/FlareSolverr#installation) for more details.
+
+## Configuration
+
+### Docker Setup
+
+The Docker Compose configuration automatically sets up FlareSolverr:
+
+```yaml
+flaresolverr:
+  image: ghcr.io/flaresolverr/flaresolverr:latest
+  container_name: flaresolverr
+  environment:
+    - LOG_LEVEL=info
+    - TZ=UTC
+  ports:
+    - 8191:8191
+  restart: unless-stopped
+```
+
+Prowlarr is configured to use FlareSolverr via the initialization script (`configure-prowlarr.sh`).
+
+### Manual Prowlarr Setup
+
+If configuring Prowlarr manually:
+
+<Steps>
+  <Step title="Open Prowlarr settings">
+    Navigate to `http://localhost:9696`
+    
+    Go to **Settings** → **Indexers** → **Indexer Proxies**
+  </Step>
+
+  <Step title="Add FlareSolverr proxy">
+    Click the **+** button to add a new indexer proxy.
+    
+    Select **FlareSolverr** from the list.
+  </Step>
+
+  <Step title="Configure the proxy">
+    Set the following:
+    - **Name**: `FlareSolverr`
+    - **Host**: `http://localhost:8191` (bare metal) or `http://flaresolverr:8191` (Docker)
+    - **Request Timeout**: `60` seconds
+    
+    Click **Test** to verify connectivity.
+  </Step>
+
+  <Step title="Assign to indexers">
+    When adding or editing indexers, select **FlareSolverr** from the **Indexer Proxy** dropdown.
+    
+    Only assign FlareSolverr to indexers that require Cloudflare bypass (most don't need it).
+  </Step>
+</Steps>
+
+### Automatic Configuration (`configure-prowlarr.sh:107-139`)
+
+Plank's Docker setup automatically configures FlareSolverr:
+
+```bash
+# Automatically runs during container initialization
+setup_flaresolverr() {
+  # Check if FlareSolverr proxy already exists
+  if check_flaresolverr_proxy "$api_key"; then
+    return 0
+  fi
+  
+  # Create FlareSolverr proxy via Prowlarr API
+  curl -X POST \
+    -H "X-Api-Key: ${api_key}" \
+    -H "Content-Type: application/json" \
+    -d '{"name":"FlareSolverr","implementation":"FlareSolverr","configContract":"FlareSolverrSettings","fields":[{"name":"host","value":"http://flaresolverr:8191"},{"name":"requestTimeout","value":60}],"tags":[]}' \
+    "${PROWLARR_URL}/api/v1/indexerproxy"
+}
+```
+
+**No manual configuration needed when using Docker.**
+
+## How It Works
+
+When Prowlarr searches an indexer with FlareSolverr enabled:
+
+1. **Prowlarr sends the request** to FlareSolverr instead of directly to the indexer
+2. **FlareSolverr launches a headless browser** (Chromium)
+3. **The browser navigates** to the indexer URL
+4. **JavaScript challenges are executed** in the real browser environment
+5. **Cookies are captured** after solving challenges
+6. **FlareSolverr returns** the HTML response to Prowlarr
+7. **Prowlarr parses** the results as if it had accessed the site directly
+
+### Request Flow
+
+```
+Plank → Prowlarr → FlareSolverr → [Chromium Browser] → Indexer (with Cloudflare)
+                                       ↓
+                              Solve JS Challenge
+                                       ↓
+                              Return HTML Content
+                                       ↓
+Plank ← Prowlarr ← FlareSolverr ← [Parsed Results]
+```
+
+## Testing FlareSolverr
+
+### Health Check
+
+Verify FlareSolverr is running:
+
+```bash
+curl http://localhost:8191/
+```
+
+Expected response:
+
+```json
+{
+  "msg": "FlareSolverr is ready!",
+  "version": "3.x.x",
+  "userAgent": "Mozilla/5.0..."
+}
+```
+
+### Test Request (`configure-prowlarr.sh:141-157`)
+
+The initialization script tests FlareSolverr connectivity:
+
+```bash
+test_flaresolverr() {
+  response=$(curl -s -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"cmd":"request.get","url":"https://httpbin.org/ip","maxTimeout":60000}' \
+    "http://flaresolverr:8191/v1")
+  
+  if echo "$response" | grep -q '"status":"ok"'; then
+    echo "FlareSolverr is working correctly"
+  fi
+}
+```
+
+### Manual Test
+
+Test solving a Cloudflare challenge:
+
+```bash
+curl -X POST http://localhost:8191/v1 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cmd": "request.get",
+    "url": "https://1337x.to",
+    "maxTimeout": 60000
+  }'
+```
+
+Successful response includes `"status":"ok"` and the page HTML.
+
+## Performance Considerations
+
+### Resource Usage
+
+FlareSolverr is resource-intensive because it runs a real browser:
+
+- **Memory**: 200-500 MB per concurrent request
+- **CPU**: Moderate usage during JavaScript execution
+- **Startup time**: 5-15 seconds for first request (browser initialization)
+- **Request time**: 5-30 seconds per Cloudflare-protected page
+
+### Optimization Tips
+
+1. **Only use for protected indexers** - Don't assign FlareSolverr to indexers that don't need it
+2. **Increase timeout** - Set `requestTimeout` to 60+ seconds for slow indexers
+3. **Limit concurrent requests** - FlareSolverr handles one request at a time by default
+4. **Monitor memory** - Restart FlareSolverr periodically if memory grows
+5. **Use dedicated container** - Run FlareSolverr in a separate Docker container (already done in Plank's setup)
+
+## Troubleshooting
+
+### FlareSolverr not responding
+
+**Problem**: Requests to FlareSolverr time out or fail.
+
+**Solutions**:
+- Check if FlareSolverr container is running: `docker ps | grep flaresolverr`
+- View logs: `docker logs flaresolverr`
+- Restart the container: `docker restart flaresolverr`
+- Verify port 8191 is not blocked by firewall
+- Ensure Chromium/Chrome is installed (bare metal)
+
+### Cloudflare challenges still blocking
+
+**Problem**: Indexers return Cloudflare error pages despite FlareSolverr.
+
+**Solutions**:
+- Some indexers use CAPTCHA challenges that FlareSolverr can't solve automatically
+- Increase `requestTimeout` in Prowlarr (try 90-120 seconds)
+- Check FlareSolverr logs for specific error messages
+- Try accessing the indexer directly in a browser to see what challenge appears
+- Consider using a different indexer if challenges are unsolvable
+
+### Browser crashes or timeouts
+
+**Problem**: FlareSolverr logs show browser crashes or timeout errors.
+
+**Solutions**:
+- Increase Docker container memory limit (try 1GB+)
+- Set `LOG_LEVEL=debug` in FlareSolverr environment to see detailed errors
+- Update FlareSolverr to the latest version
+- Check if `/dev/shm` has enough space (browser needs shared memory)
+- Restart FlareSolverr to clear stale browser processes
+
+### Prowlarr can't connect to FlareSolverr
+
+**Problem**: Prowlarr shows FlareSolverr proxy as unhealthy.
+
+**Solutions**:
+- **Docker**: Use `http://flaresolverr:8191` (service name, not localhost)
+- **Bare metal**: Use `http://localhost:8191`
+- Verify both services are on the same Docker network
+- Check if FlareSolverr is accessible: `curl http://flaresolverr:8191/` (from Prowlarr container)
+- Review Prowlarr logs for specific connection errors
+
+## Environment Variables
+
+FlareSolverr supports these configuration options:
+
+```bash
+# Logging level (info, debug, error)
+LOG_LEVEL=info
+
+# Timezone for logs
+TZ=UTC
+
+# Maximum timeout per request (milliseconds)
+MAX_TIMEOUT=60000
+
+# Headless mode (true recommended for servers)
+HEADLESS=true
+```
+
+These are set in the Docker Compose file or passed when running manually.
+
+## Indexers That Need FlareSolverr
+
+Common indexers that require Cloudflare bypass:
+
+- **1337x** - Often uses Cloudflare challenges
+- **The Pirate Bay** - Intermittent Cloudflare protection
+- **TorrentGalaxy** - Uses JavaScript challenges
+- **LimeTorrents** - Cloudflare-protected
+- **RARBG mirrors** - Many mirrors use Cloudflare
+
+Indexers that typically **don't** need FlareSolverr:
+
+- **YTS** - No Cloudflare protection
+- **EZTV** - Direct API access
+- **Nyaa.si** - No anti-bot protection
+- **AnimeTosho** - API-friendly
+
+## Security Considerations
+
+FlareSolverr runs a real browser, which has security implications:
+
+- **Isolate the container** - Use Docker for sandboxing
+- **Don't expose port 8191** publicly - Only allow access from Prowlarr
+- **Keep updated** - Update FlareSolverr regularly for security patches
+- **Monitor resource usage** - Prevent abuse by monitoring logs and traffic
+- **Use behind VPN** - Route FlareSolverr traffic through a VPN for privacy
+
+## Learn More
+
+- [FlareSolverr GitHub](https://github.com/FlareSolverr/FlareSolverr)
+- [FlareSolverr Documentation](https://github.com/FlareSolverr/FlareSolverr/wiki)
+- [Prowlarr FlareSolverr Integration](https://wiki.servarr.com/prowlarr/settings#indexer-proxies)

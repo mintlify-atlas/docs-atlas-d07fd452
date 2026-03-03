@@ -1,0 +1,267 @@
+---
+title: Subtitles API
+description: Search, download, and manage subtitles
+---
+
+The Subtitles API allows you to discover local subtitles, search OpenSubtitles, and manage subtitle tracks for your media.
+
+## Get Subtitle Tracks
+
+Get available subtitle tracks for a media item. Automatically discovers local subtitle files.
+
+```http
+GET /api/media/{id}/subtitles
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Media ID
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="episodeId" type="string">
+  Episode ID (for TV shows)
+</ParamField>
+
+### Response
+
+Returns an array of subtitle tracks.
+
+```json
+[
+  {
+    "id": "sub_123",
+    "mediaId": "clx123456",
+    "episodeId": null,
+    "language": "en",
+    "label": "English",
+    "source": "embedded",
+    "isDefault": true,
+    "isForced": false,
+    "src": "/api/media/clx123456/subtitles/sub_123"
+  },
+  {
+    "id": "sub_124",
+    "mediaId": "clx123456",
+    "episodeId": null,
+    "language": "es",
+    "label": "Spanish",
+    "source": "opensubtitles",
+    "isDefault": false,
+    "isForced": false,
+    "src": "/api/media/clx123456/subtitles/sub_124"
+  }
+]
+```
+
+### Subtitle Sources
+
+- `embedded` - Subtitle tracks embedded in the video file
+- `local` - Subtitle files discovered in the same directory as the video
+- `opensubtitles` - Subtitles downloaded from OpenSubtitles
+
+### Behavior
+
+- Triggers background discovery of local subtitle files
+- Returns all known subtitle tracks immediately
+- Discovered subtitles are automatically added to the database
+
+## Search Subtitles
+
+Search for subtitles on OpenSubtitles.
+
+```http
+GET /api/media/{id}/subtitles/search
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Media ID
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="languages" type="string">
+  Comma-separated language codes (e.g., "en,es,fr")
+</ParamField>
+
+<ParamField query="seasonNumber" type="string">
+  Season number for TV shows
+</ParamField>
+
+<ParamField query="episodeNumber" type="string">
+  Episode number for TV shows
+</ParamField>
+
+### Response
+
+Returns an array of subtitle search results.
+
+```json
+[
+  {
+    "fileId": 1234567,
+    "language": "en",
+    "languageName": "English",
+    "movieReleaseName": "Inception.2010.1080p.BluRay.x264-GROUP",
+    "subFileName": "Inception.2010.1080p.BluRay.x264-GROUP.srt",
+    "downloadCount": 5234,
+    "rating": 9.2,
+    "fromTrusted": true,
+    "hearing_impaired": false
+  }
+]
+```
+
+### Search Parameters
+
+- Uses TMDB ID for accurate matching when available
+- Falls back to title/year search
+- Filters by language preferences
+- Supports both movies and TV episodes
+
+## Download Subtitle
+
+Download a subtitle from OpenSubtitles and add it to your media.
+
+```http
+POST /api/media/{id}/subtitles/download
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Media ID
+</ParamField>
+
+### Request Body
+
+<ParamField body="fileId" type="number" required>
+  OpenSubtitles file ID (from search results)
+</ParamField>
+
+<ParamField body="language" type="string" required>
+  Language code (e.g., "en", "es")
+</ParamField>
+
+<ParamField body="episodeId" type="string">
+  Episode ID (for TV shows)
+</ParamField>
+
+### Example Request
+
+```json
+{
+  "fileId": 1234567,
+  "language": "en",
+  "episodeId": "ep_456"
+}
+```
+
+### Response
+
+```json
+{
+  "id": "sub_125",
+  "mediaId": "clx123456",
+  "episodeId": "ep_456",
+  "language": "en",
+  "label": "English",
+  "source": "opensubtitles",
+  "isDefault": false,
+  "isForced": false,
+  "src": "/api/media/clx123456/subtitles/sub_125",
+  "fileName": "subtitle.vtt"
+}
+```
+
+### Behavior
+
+- Downloads subtitle file from OpenSubtitles
+- Converts to WebVTT format
+- Stores in media library directory
+- Creates database record
+- Returns subtitle track ready for playback
+
+## Stream Subtitle
+
+Stream a subtitle file in WebVTT format.
+
+```http
+GET /api/media/{id}/subtitles/{subtitleId}
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Media ID
+</ParamField>
+
+<ParamField path="subtitleId" type="string" required>
+  Subtitle track ID
+</ParamField>
+
+### Response
+
+Returns the subtitle file in WebVTT format with `Content-Type: text/vtt`.
+
+```
+WEBVTT
+
+00:00:00.000 --> 00:00:02.500
+Welcome to the movie
+
+00:00:02.500 --> 00:00:05.000
+Enjoy the show!
+```
+
+### Subtitle Format
+
+- All subtitles are served in WebVTT format
+- Compatible with HTML5 video players
+- Supports styling and positioning
+- Embedded subtitles are extracted on-demand
+
+## Language Codes
+
+Common ISO 639-1 language codes:
+
+- `en` - English
+- `es` - Spanish
+- `fr` - French
+- `de` - German
+- `it` - Italian
+- `pt` - Portuguese
+- `ru` - Russian
+- `ja` - Japanese
+- `ko` - Korean
+- `zh` - Chinese
+- `ar` - Arabic
+- `hi` - Hindi
+
+## Error Handling
+
+### Search Errors
+
+```json
+{
+  "message": "Search failed"
+}
+```
+
+### Download Errors
+
+```json
+{
+  "message": "Download failed"
+}
+```
+
+### Common Issues
+
+- **401 Unauthorized** - OpenSubtitles API key not configured
+- **404 Not Found** - Media or subtitle not found
+- **500 Internal Server Error** - OpenSubtitles API error or network issue

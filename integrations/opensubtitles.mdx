@@ -1,0 +1,285 @@
+---
+title: OpenSubtitles Integration
+description: Download subtitles in multiple languages for your media library
+---
+
+OpenSubtitles is the world's largest subtitle database, providing subtitles in dozens of languages for movies and TV shows. Plank integrates with OpenSubtitles to automatically find and download subtitles for your media.
+
+## Overview
+
+OpenSubtitles integration provides:
+
+- **Multi-language subtitles** in 50+ languages
+- **Automatic matching** based on TMDB/IMDB IDs and file metadata
+- **Quality filtering** by download count, ratings, and trusted uploaders
+- **Hearing-impaired variants** for accessibility
+- **Automatic format conversion** from SRT to WebVTT for web playback
+
+OpenSubtitles is **optional** but highly recommended for international content and accessibility.
+
+## Getting Started
+
+<Steps>
+  <Step title="Create an account">
+    Visit [opensubtitles.com](https://www.opensubtitles.com) and create a free account.
+    
+    Free accounts can download up to **200 subtitles per day**.
+  </Step>
+
+  <Step title="Get API credentials">
+    Navigate to the [API Consumers](https://www.opensubtitles.com/consumers) page.
+    
+    Click **Create new consumer** and fill out:
+    - **Name**: `Plank Media Server`
+    - **Type**: Personal use
+    - **Description**: Self-hosted media streaming
+    
+    Submit to receive your **API Key**.
+  </Step>
+
+  <Step title="Configure Plank">
+    Add your credentials to `.env`:
+    
+    ```bash
+    OPENSUBTITLES_API_KEY=your_api_key_here
+    OPENSUBTITLES_USERNAME=your_username
+    OPENSUBTITLES_PASSWORD=your_password
+    ```
+  </Step>
+
+  <Step title="Test the connection">
+    Restart Plank and navigate to a movie or TV episode.
+    
+    Click the **Subtitles** button to search available subtitles.
+  </Step>
+</Steps>
+
+## Configuration
+
+### Environment Variables
+
+Required settings in `.env`:
+
+```bash
+# API key from opensubtitles.com/consumers
+OPENSUBTITLES_API_KEY=
+
+# Your OpenSubtitles account credentials
+OPENSUBTITLES_USERNAME=
+OPENSUBTITLES_PASSWORD=
+```
+
+### Settings UI
+
+Alternatively, configure through Plank's settings interface:
+
+1. Navigate to **Settings** → **Integrations**
+2. Locate the **OpenSubtitles** section
+3. Enter your API key, username, and password
+4. Click **Save**
+
+## Searching for Subtitles
+
+Plank searches OpenSubtitles using multiple strategies for best results:
+
+### Search Parameters (`opensubtitles.ts:273-308`)
+
+**For Movies**:
+- TMDB ID (most accurate)
+- IMDB ID (fallback)
+- Title + year (if IDs unavailable)
+
+**For TV Shows**:
+- TMDB ID + season + episode number
+- IMDB ID + season + episode number  
+- Title + year + season + episode (fallback)
+
+### Language Selection
+
+Plank supports all 50+ languages available on OpenSubtitles. Popular languages include:
+
+- English (`en`)
+- Spanish (`es`)
+- French (`fr`)
+- German (`de`)
+- Italian (`it`)
+- Portuguese (`pt`)
+- Japanese (`ja`)
+- Korean (`ko`)
+- Chinese (`zh`)
+- Arabic (`ar`)
+
+You can search for multiple languages simultaneously:
+
+```typescript
+// Search for English and Spanish subtitles
+languages: "en,es"
+```
+
+### Result Ranking
+
+Results are sorted by:
+
+1. **Download count** (most popular first)
+2. **Exact match** (TMDB ID match vs. title-only match)
+3. **Trusted uploaders** (verified contributors)
+4. **Rating and votes** (community quality scores)
+
+## Downloading Subtitles
+
+When you select a subtitle:
+
+1. **Authentication** - Plank logs in with your credentials (token cached for 23 hours)
+2. **Download request** - Sends file ID to OpenSubtitles API
+3. **File retrieval** - Downloads the subtitle file (usually SRT format)
+4. **Format conversion** - Converts SRT to WebVTT using FFmpeg for web compatibility
+5. **Storage** - Saves to `DATA_PATH/{media_id}/subtitles/`
+
+### File Naming (`opensubtitles.ts:396-409`)
+
+Subtitles are saved with unique filenames:
+
+```
+{original_name}_{timestamp}.vtt
+```
+
+Example: `MovieTitle_1699999999.vtt`
+
+This prevents filename conflicts when downloading multiple subtitle versions.
+
+## Subtitle Quality Indicators
+
+OpenSubtitles provides quality metadata for each subtitle:
+
+### Quality Flags (`opensubtitles.ts:98-118`)
+
+- **Download Count**: Number of times downloaded (higher = more popular)
+- **Ratings**: Community rating score (0-10)
+- **Votes**: Number of user votes
+- **From Trusted**: Uploaded by verified contributor
+- **Hearing Impaired**: Includes sound descriptions for accessibility
+- **AI Translated**: Machine-translated from another language
+- **Machine Translated**: Automatically translated (may have errors)
+- **FPS**: Frame rate (helps match video timing)
+
+### Recommended Selection
+
+For best quality, choose subtitles with:
+
+- ✅ High download count (1000+ downloads)
+- ✅ "From Trusted" badge
+- ✅ Recent upload date
+- ⚠️ Not AI or machine translated (unless no other option)
+- ✅ Matching FPS to your video (if known)
+
+## Rate Limits
+
+OpenSubtitles API has the following limits:
+
+### Free Accounts
+
+- **200 subtitle downloads per day**
+- **40 requests per 10 seconds**
+- Token expires after 24 hours (automatically refreshed)
+
+### VIP Accounts
+
+- **1000 subtitle downloads per day**
+- **Higher request rate limits**
+- Priority support
+
+Plank caches authentication tokens to minimize API requests.
+
+## Troubleshooting
+
+### Login failed
+
+**Problem**: "OpenSubtitles login failed" error.
+
+**Solutions**:
+- Verify username and password are correct (case-sensitive)
+- Check that your account is active on opensubtitles.com
+- Ensure API key is valid and not revoked
+- Try resetting your password on OpenSubtitles
+
+### No subtitles found
+
+**Problem**: Search returns zero results.
+
+**Solutions**:
+- Verify the media has TMDB metadata (required for accurate matching)
+- Try searching with a different language code
+- Check if the title/year are correct in Plank's database
+- Search directly on opensubtitles.com to verify subtitle availability
+- Ensure the content is not too new (subtitles may not be uploaded yet)
+
+### Download quota exceeded
+
+**Problem**: "Download limit reached" error.
+
+**Solutions**:
+- Free accounts are limited to 200 downloads per day
+- Wait until the next day (quota resets at midnight UTC)
+- Consider upgrading to a VIP account for higher limits
+- Delete unused subtitle files to avoid re-downloading
+
+### Format conversion fails
+
+**Problem**: Subtitles download but won't play.
+
+**Solutions**:
+- Ensure FFmpeg is installed and accessible in PATH
+- Check Plank logs for FFmpeg errors
+- Verify write permissions to `DATA_PATH/{media_id}/subtitles/`
+- If VTT conversion fails, Plank falls back to serving the original SRT file
+
+### Authentication token expired
+
+**Problem**: "Token invalid" errors mid-session.
+
+**Solutions**:
+- Tokens are cached for 23 hours and auto-refresh
+- Restart Plank to force a fresh login
+- Check system clock is accurate (token expiry relies on timestamps)
+- Verify credentials haven't changed on OpenSubtitles
+
+## Supported Languages
+
+OpenSubtitles supports 50+ languages. Plank maps ISO 639-1 (2-letter) codes to full language names:
+
+```typescript
+const LANGUAGE_NAMES = {
+  en: 'English',
+  es: 'Spanish',
+  fr: 'French',
+  de: 'German',
+  it: 'Italian',
+  pt: 'Portuguese',
+  ja: 'Japanese',
+  ko: 'Korean',
+  zh: 'Chinese',
+  ar: 'Arabic',
+  ru: 'Russian',
+  // ... 40+ more languages
+}
+```
+
+See `opensubtitles.ts:121-156` for the complete language list.
+
+## Data Privacy
+
+OpenSubtitles integration:
+
+- Sends your username/password only during login (over HTTPS)
+- Shares search queries (title, TMDB ID, season/episode) with OpenSubtitles
+- Does not transmit information about your full library
+- Stores authentication tokens locally (expires after 24 hours)
+- Downloads are logged by OpenSubtitles for rate limiting
+
+Follow OpenSubtitles' [Terms of Service](https://www.opensubtitles.com/en/terms) when using their API.
+
+## Learn More
+
+- [OpenSubtitles API Documentation](https://opensubtitles.stoplight.io/docs/opensubtitles-api)
+- [Request API Access](https://www.opensubtitles.com/consumers)
+- [Supported Languages](https://www.opensubtitles.com/en/languages)

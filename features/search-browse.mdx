@@ -1,0 +1,294 @@
+---
+title: Search & Browse
+description: Discover and search for movies and TV shows
+icon: search
+---
+
+Plank provides two powerful ways to discover content: browsing curated collections from TMDB and searching your personal library or the web.
+
+## Browse for New Content
+
+The browse view helps you discover new movies and TV shows to add to your library.
+
+### Content Sources
+
+<CardGroup cols={2}>
+  <Card title="Trending" icon="flame">
+    Currently trending content on TMDB, updated daily. Shows what's popular right now across movies and TV.
+  </Card>
+  
+  <Card title="Popular" icon="trophy">
+    All-time popular content based on TMDB ratings and views. Discover classics and crowd favorites.
+  </Card>
+</CardGroup>
+
+### Browse Features
+
+#### Infinite Scroll
+
+The browse view loads content progressively:
+- Initial page loads 20 items
+- Automatically loads more as you scroll
+- Smooth loading with skeleton placeholders
+- Caches pages for instant navigation
+
+#### Filter by Type
+
+Use the filter dropdown to narrow results:
+- **All**: Movies and TV shows together
+- **Movies**: Movies only
+- **TV Shows**: TV shows only
+
+Filters persist when switching between trending and popular tabs.
+
+#### Rich Metadata
+
+Each browse card shows:
+- High-quality poster image
+- Title and release year
+- MPAA rating badge (G, PG, PG-13, R, NC-17)
+- TMDB rating
+- Overview/description
+- Genres
+
+#### Lazy Detail Enrichment
+
+Browse uses a two-stage loading strategy for optimal performance:
+
+1. **Initial Load**: Basic metadata from TMDB (fast)
+2. **Background Enrichment**: IMDB IDs, certifications, and cached magnet links loaded in batches
+
+This provides instant browsing while enriching data in the background.
+
+### Adding Content from Browse
+
+When you find something you want to watch:
+
+#### Movies
+
+1. Click the plus icon on any movie card
+2. Plank automatically:
+   - Resolves IMDB ID from TMDB
+   - Searches Prowlarr for high-quality torrents
+   - Filters for trusted release groups (YTS, BONE, etc.)
+   - Selects best quality torrent (1080p preferred)
+   - Adds to your library
+   - Starts downloading
+
+#### TV Shows
+
+TV shows have additional options:
+
+1. Click the three-dot menu on a TV show card
+2. Select "Add Season"
+3. Choose which season(s) to add
+4. Plank resolves the season torrent and adds it
+
+When adding seasons:
+- **First season**: Creates new show entry
+- **Additional seasons**: Merges into existing show (if same TMDB ID)
+- **Episode mapping**: Automatically maps files to episodes
+
+#### Watch Now
+
+For instant gratification:
+
+1. Click "Watch Now" on any movie
+2. Adds to library and immediately navigates to player
+3. Starts streaming as soon as buffer is ready
+
+Perfect for "I want to watch this right now" moments.
+
+### Torrent Resolution
+
+Plank intelligently finds torrents for browse content:
+
+#### Prowlarr Integration
+
+Browse uses Prowlarr to search multiple torrent indexers:
+- Queries by IMDB ID or title + year
+- Filters by minimum seeders (configurable, default 5)
+- Trusts specific release groups (configurable)
+- Selects highest quality available (up to 1080p)
+- Caches results for 24 hours
+
+#### Quality Priority
+
+Torrent selection prioritizes quality in this order:
+1. **1080p** (highest priority for compatibility and quality)
+2. **720p** (fallback for smaller files)
+3. **2160p/4K** (only if no 1080p available, may have compatibility issues)
+
+Lower quality releases are ignored unless configured otherwise.
+
+#### Trusted Groups
+
+By default, Plank trusts these release groups:
+- **YTS**: High-quality movie encodes with small file sizes
+- **BONE**: Popular scene group
+- (Configurable via settings)
+
+You can modify trusted groups in the Prowlarr configuration.
+
+### Prefetching
+
+Browse aggressively prefetches data for instant interactions:
+
+#### Magnet Link Prefetch
+
+On hover over a movie card:
+- Resolves magnet link in background
+- Caches result in React Query
+- Makes "Add to Library" instant on click
+
+#### Season Prefetch
+
+On hover over a TV show menu:
+- Fetches season list from TMDB
+- Caches season metadata
+- Makes season selector instant
+
+#### Season Torrent Prefetch
+
+On hover over individual seasons:
+- Resolves season torrent in background
+- Caches magnet link
+- Makes "Add Season" instant on click
+
+#### Tab Prefetch
+
+When viewing trending, popular is prefetched (and vice versa):
+- Next tab loads in background
+- Tab switches are instant
+- Seamless browsing experience
+
+## Search Your Library
+
+Quickly find content you've already added.
+
+### Full-Text Search
+
+Library search uses SQLite FTS5 (Full-Text Search):
+
+- **Instant results**: As you type
+- **Fuzzy matching**: Finds partial matches
+- **Ranked results**: Most relevant first
+- **Fallback**: Uses LIKE queries if FTS fails
+
+### Search Scope
+
+Library search is profile-scoped:
+- Only searches your active profile's library
+- Isolated from other profiles
+- Fast queries with indexed lookups
+
+### Search Fields
+
+Search queries match against:
+- Media title
+- Overview/description
+- (Additional metadata can be added)
+
+### Search UI
+
+The search interface provides:
+- Real-time results grid
+- Same card layout as library
+- Direct navigation to media pages
+- Quick play access
+
+## Browse Performance
+
+### Caching Strategy
+
+Browse data is heavily cached for performance:
+
+- **TMDB API results**: 30 minutes
+- **Torrent resolution**: 24 hours (in database)
+- **Season metadata**: 1 hour
+- **Detail enrichment**: 30 minutes
+
+Caching reduces API calls and provides instant browsing.
+
+### Infinite Scroll Optimization
+
+- **Intersection Observer**: Triggers next page 300px before bottom
+- **Deduplication**: Prevents duplicate items across pages
+- **Skeleton Loading**: Shows placeholders during fetch
+- **Query Dedup**: React Query prevents redundant fetches
+
+### Image Loading
+
+Poster images are optimized:
+
+- **Lazy loading**: First 18 items load eagerly, rest lazy load
+- **TMDB CDN**: Images served from fast TMDB CDN
+- **Size optimization**: Requests optimal poster size (w500)
+- **Cached locally**: Downloaded images cached in library/images
+
+## Prowlarr Setup
+
+Browse requires Prowlarr to be configured:
+
+### Configuration Steps
+
+1. Enter Prowlarr URL in Plank settings
+2. Add Prowlarr API key
+3. Configure indexers in Prowlarr
+4. Set trusted release groups (optional)
+5. Set minimum seeders threshold (optional)
+
+### Indexer Requirements
+
+For best results, configure indexers that support:
+- IMDB ID search
+- Good seeder counts
+- Trusted release groups
+- 1080p releases
+
+Recommended public indexers:
+- YTS (movies)
+- EZTV (TV shows)
+- 1337x (both)
+
+## Advanced Features
+
+### Context Menus
+
+Right-click or long-press on browse cards for:
+- Add to library
+- Watch now
+- View on TMDB
+- Copy TMDB/IMDB ID
+- (TV shows) Season selector
+
+### Season Selection
+
+TV show season selection shows:
+- Season number and name
+- Episode count
+- Air year
+- Season poster
+
+Select multiple seasons to add them all at once (each as separate torrent).
+
+### Error Handling
+
+Browse gracefully handles errors:
+
+- **No Prowlarr**: Shows setup instructions
+- **No torrents found**: Displays helpful message
+- **API failures**: Retries with exponential backoff
+- **Network offline**: Shows offline indicator
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Media Library" icon="library" href="/features/media-library">
+    Learn how to manage your streaming collection
+  </Card>
+  
+  <Card title="Organizations" icon="users" href="/features/organizations">
+    Set up profiles for different users or use cases
+  </Card>
+</CardGroup>

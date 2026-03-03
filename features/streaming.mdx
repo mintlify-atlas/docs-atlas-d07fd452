@@ -1,0 +1,252 @@
+---
+title: Video Streaming
+description: Stream torrents directly while they download
+icon: play
+---
+
+Plank's streaming engine lets you watch content immediately while it downloads in the background. No waiting for full downloads required.
+
+## Streaming Overview
+
+Plank uses a smart streaming system that combines torrent downloading with HTTP range requests to provide smooth playback:
+
+<CardGroup cols={2}>
+  <Card title="Instant Playback" icon="zap">
+    Start watching as soon as ~5% of the file has downloaded. The player buffers ahead while you watch.
+  </Card>
+  
+  <Card title="Format Transcoding" icon="convert">
+    Automatic real-time transcoding for MKV and AVI files to browser-compatible MP4 using FFmpeg.
+  </Card>
+  
+  <Card title="Range Requests" icon="sliders">
+    HTTP range request support allows seeking anywhere in the video, even if that part hasn't downloaded yet.
+  </Card>
+  
+  <Card title="Adaptive Buffering" icon="wifi">
+    Smart buffering prioritizes the parts you're watching while continuing to download the full file.
+  </Card>
+</CardGroup>
+
+## How Streaming Works
+
+When you click play on media:
+
+1. **Torrent Initialization**: Plank starts the torrent download if not already active
+2. **Video Detection**: Identifies the primary video file in the torrent
+3. **Buffering**: Downloads the first ~5% of the file for initial playback
+4. **Stream Start**: Video player begins playback
+5. **Progressive Download**: Continues downloading while you watch
+
+### For Movies
+
+Movie streaming is straightforward:
+- Single video file per torrent
+- Automatic quality detection
+- Full range-seeking support
+- Progress saved across sessions
+
+### For TV Episodes
+
+TV episodes require additional logic:
+- Torrent may contain multiple episodes
+- Files mapped to TMDB episode metadata
+- Per-episode progress tracking
+- File index selection for multi-file torrents
+
+## Video Player Features
+
+### Built on Vidstack
+
+Plank uses Vidstack, a modern video player framework with:
+
+- **Responsive Controls**: Touch-friendly playback controls
+- **Keyboard Shortcuts**: Space to play/pause, arrow keys to seek, F for fullscreen
+- **Gesture Support**: Tap to show/hide controls, swipe gestures
+- **Picture-in-Picture**: Watch in a floating window
+- **Fullscreen**: Native fullscreen support on all devices
+
+### Playback Controls
+
+- **Play/Pause**: Click video or use spacebar
+- **Seek**: Drag the progress bar or use arrow keys (±10 seconds)
+- **Volume**: Adjust volume and mute controls
+- **Playback Speed**: Change speed from 0.25x to 2x
+- **Quality**: Automatic quality based on source file
+- **Subtitles**: Select from available subtitle tracks
+
+### Progress Tracking
+
+Your playback position is automatically saved:
+
+- **Auto-save**: Position saved every 5 seconds
+- **Resume on Return**: Automatically resume from last position
+- **Completion Detection**: Marks as complete when you watch to the end
+- **Cross-Session**: Progress persists even if you close the browser
+- **Beacon Fallback**: Uses sendBeacon API to save position on page unload
+
+## File Format Support
+
+### Native Formats
+
+These formats play directly in the browser without transcoding:
+
+- **MP4** (H.264/H.265 video, AAC audio)
+- **WebM** (VP8/VP9 video, Vorbis/Opus audio)
+
+Native formats support full HTTP range requests for instant seeking.
+
+### Transcoded Formats
+
+These formats are automatically transcoded to MP4 in real-time:
+
+- **MKV** (Matroska)
+- **AVI** (Audio Video Interleave)
+- **MOV** (QuickTime)
+
+Transcoded streams:
+- Use FFmpeg for real-time conversion
+- Slightly higher CPU usage on the server
+- No seeking support during transcoding
+- Cached to library as MP4 when complete
+
+### MIME Type Detection
+
+Plank automatically detects video formats and sets proper MIME types:
+
+```
+Extension → MIME Type
+.mp4     → video/mp4
+.webm    → video/webm
+.mkv     → video/x-matroska (transcoded to video/mp4)
+.avi     → video/x-msvideo (transcoded to video/mp4)
+.mov     → video/quicktime
+```
+
+## Streaming States
+
+The video player shows different states during streaming:
+
+### Initializing
+
+Shown when the torrent is being added to the download manager:
+- Animated spinner with pulsing ring
+- "Loading..." message
+- Background poster image (blurred)
+
+### Buffering
+
+Displayed when waiting for enough data to start playback:
+- Download speed indicator
+- Peer count
+- Progress percentage
+- Visual progress bar
+
+You can monitor buffering stats in the player menu under "Show Stats".
+
+### Playing
+
+Normal playback with full controls:
+- Vidstack player controls
+- Subtitle selection
+- Quality display
+- Playback speed control
+
+### Error States
+
+If streaming fails, you'll see:
+- Error message (e.g., "No seeders available")
+- Retry option
+- Go back button
+
+## Download Stats During Playback
+
+Toggle stats overlay from the player menu to see:
+
+- **Download Speed**: Current download speed in MB/s or KB/s
+- **Peer Count**: Number of connected peers
+- **Progress Bar**: Visual download progress
+- **Torrent Status**: Real-time status updates
+
+Stats are useful for monitoring:
+- Whether the buffer is staying ahead of playback
+- If you're connected to enough peers
+- Estimated time until full download
+
+## Advanced: Range Requests
+
+Plank's streaming engine supports HTTP range requests, which enable:
+
+### Seeking While Downloading
+
+When you seek to a new position:
+1. Player requests specific byte range
+2. Torrent client prioritizes downloading that range
+3. Playback resumes once enough data is available
+4. Background download continues for the full file
+
+### Library Files
+
+Completed files in your library use standard range requests:
+- Instant seeking to any position
+- Lower server resource usage
+- Cached with `max-age=3600` headers
+- No transcoding overhead
+
+### Downloading Files
+
+Files still downloading use torrent-based range requests:
+- Dynamic range generation
+- Prioritized piece downloading
+- `Cache-Control: no-cache` headers
+- May require buffering for seeks
+
+## Performance Optimization
+
+### Server-Side
+
+- **Stream Reuse**: Streams are created on-demand and destroyed when done
+- **Error Handling**: Graceful handling of client disconnects
+- **Backpressure**: Proper Node.js stream backpressure handling
+- **Memory Management**: Streams destroyed on abort to prevent leaks
+
+### Client-Side
+
+- **Adaptive Buffering**: Player automatically adjusts buffer size
+- **Prefetching**: Vidstack prefetches upcoming segments
+- **Lazy Loading**: Video player only loads when media is ready
+- **Resource Cleanup**: Proper cleanup on page navigation
+
+## Troubleshooting Streaming Issues
+
+### Video Won't Start
+
+- **Check peers**: Make sure torrent has seeders (check stats)
+- **Wait for buffer**: Give it 30-60 seconds to buffer
+- **Check format**: Some exotic codecs may not be supported
+- **Retry download**: Use retry button on media page
+
+### Buffering/Stuttering
+
+- **Slow download**: Check download speed in stats overlay
+- **Low peers**: Torrent may have few seeders
+- **Server load**: High CPU usage from transcoding (MKV/AVI)
+- **Seek less**: Let buffer build up before seeking
+
+### Seeking Not Working
+
+- **Transcoded files**: MKV/AVI don't support seeking during transcode
+- **Still downloading**: May need to wait for target range to download
+- **Wait for completion**: Seeking works perfectly on completed files
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Subtitles" icon="closed-captioning" href="/features/subtitles">
+    Learn how to add and manage subtitles for your videos
+  </Card>
+  
+  <Card title="Media Library" icon="library" href="/features/media-library">
+    Organize and manage your streaming collection
+  </Card>
+</CardGroup>

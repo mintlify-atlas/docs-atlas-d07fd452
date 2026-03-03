@@ -1,0 +1,159 @@
+---
+title: 'Quick Start'
+description: 'Get Plank running in minutes with our one-line deploy script'
+icon: 'rocket'
+---
+
+<Note>
+  The deploy script automatically handles dependency installation, repository cloning, environment configuration, and server startup.
+</Note>
+
+## One-Line Deploy
+
+The fastest way to get Plank running is with our automated deployment script:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/logscore/plank/master/scripts/deploy.sh)
+```
+
+## What the Script Does
+
+The deploy script will:
+
+1. **Detect your operating system** (Ubuntu, Debian, Fedora, Arch, Alpine, macOS)
+2. **Install missing dependencies** (Git, Docker, or Node.js/npm/ffmpeg for bare metal)
+3. **Clone the Plank repository**
+4. **Guide you through environment setup**
+   - TMDB API key configuration
+   - Authentication secret generation
+   - Port and URL configuration
+5. **Choose deployment method**
+   - Docker Compose (recommended)
+   - Bare metal installation
+6. **Start the server**
+
+<Steps>
+  <Step title="Run the deploy script">
+    Execute the one-line command above. The script will automatically detect your OS and check for dependencies.
+  </Step>
+
+  <Step title="Choose deployment method">
+    When prompted, select your preferred deployment:
+    - **Deploy with Docker** (recommended) - Automatically sets up Plank, Prowlarr, and FlareSolverr
+    - **Deploy Bare Metal** - Installs directly on your system
+  </Step>
+
+  <Step title="Configure environment variables">
+    The script will prompt you for:
+    - **TMDB API Key** - Get yours at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)
+    - **Base URL** - Default: `http://localhost:3300`
+    - **Port** - Default: `3300`
+    
+    Other settings like authentication secrets are auto-generated.
+  </Step>
+
+  <Step title="Access Plank">
+    Once deployment completes, access Plank at:
+    ```
+    http://localhost:3300
+    ```
+    Or use your server's IP address if deploying remotely.
+  </Step>
+</Steps>
+
+## Post-Installation
+
+After deployment completes:
+
+1. **Create your first account** at `http://localhost:3300`
+2. **Configure Prowlarr** (Docker only):
+   - Access Prowlarr at `http://localhost:9696`
+   - Add torrent indexers (YTS, 1337x, The Pirate Bay, etc.)
+   - The API key is automatically configured
+3. **Add a TMDB API key** in Plank settings if not configured during setup
+4. **Start streaming** - Search for movies and TV shows
+
+<Warning>
+  The first account created automatically becomes an administrator. Keep your credentials secure.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Setup" icon="docker" href="/installation/docker">
+    Learn about Docker-specific configuration and management
+  </Card>
+  <Card title="Environment Variables" icon="gear" href="/installation/environment-variables">
+    Customize your installation with environment variables
+  </Card>
+  <Card title="Bare Metal" icon="server" href="/installation/bare-metal">
+    Manual installation for advanced users
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/configuration/overview">
+    Configure torrent indexers, subtitles, and more
+  </Card>
+</CardGroup>
+
+## System Requirements
+
+### Docker Deployment
+- **OS**: Linux, macOS (Docker Desktop required)
+- **RAM**: 2GB minimum, 4GB recommended
+- **Disk**: 10GB+ for downloads
+- **Dependencies**: Git, Docker, Docker Compose
+
+### Bare Metal Deployment
+- **OS**: Linux, macOS, Windows (WSL)
+- **RAM**: 2GB minimum, 4GB recommended
+- **Disk**: 10GB+ for downloads
+- **Dependencies**: Node.js 22+, npm, ffmpeg, Git
+- **Additional**: Prowlarr and FlareSolverr must be installed separately
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Script fails to download">
+    Check your internet connection and try again. If the issue persists, manually download the script:
+    
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/logscore/plank/master/scripts/deploy.sh -o deploy.sh
+    chmod +x deploy.sh
+    ./deploy.sh
+    ```
+  </Accordion>
+
+  <Accordion title="Permission denied errors">
+    The script will automatically use `sudo` for privileged operations. If you encounter permission errors:
+    
+    - Ensure you have sudo access
+    - For Docker: You may need to log out and back in after being added to the docker group
+    - Run `newgrp docker` to refresh group membership without logging out
+  </Accordion>
+
+  <Accordion title="Docker containers won't start">
+    Check if ports are already in use:
+    
+    ```bash
+    # Check port usage
+    sudo netstat -tlnp | grep -E '3300|9696|8191'
+    
+    # View container logs
+    docker compose -f docker/docker-compose.yml logs
+    ```
+  </Accordion>
+
+  <Accordion title="Can't access Plank after installation">
+    Verify the services are running:
+    
+    **Docker:**
+    ```bash
+    docker ps
+    ```
+    
+    **Bare Metal (systemd):**
+    ```bash
+    systemctl status plank
+    journalctl -u plank -f
+    ```
+  </Accordion>
+</AccordionGroup>
